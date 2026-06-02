@@ -1,0 +1,17 @@
+{
+  "created": "2026-06-02",
+  "purpose": "Codex handoff package for Analogue Pocket Amstrad CPC port",
+  "source_repositories": {
+    "mister_amstrad": "https://github.com/MiSTer-devel/Amstrad_MiSTer",
+    "pocket_zx_spectrum": "https://github.com/dave18/OpenFPGA_ZX-Spectrum",
+    "analogue_docs": "https://www.analogue.co/developer/docs/overview"
+  },
+  "recommended_mvp": [
+    "CPC 6128",
+    "boot.rom",
+    "keyboard matrix + virtual keyboard",
+    "joystick",
+    "video/audio",
+    "read-only Drive A DSK"
+  ]
+}
