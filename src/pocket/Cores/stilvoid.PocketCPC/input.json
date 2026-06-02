@@ -1,0 +1,47 @@
+{
+  "input": {
+    "magic": "APF_VER_1",
+    "controllers": [
+      {
+        "type": "default",
+        "mappings": [
+          {
+            "id": 4,
+            "name": "Fire 1 / VKB Select",
+            "key": "pad_btn_a"
+          },
+          {
+            "id": 5,
+            "name": "Fire 2 / Space",
+            "key": "pad_btn_b"
+          },
+          {
+            "id": 6,
+            "name": "Fire 3 / Return",
+            "key": "pad_btn_x"
+          },
+          {
+            "id": 7,
+            "name": "Escape / Delete",
+            "key": "pad_btn_y"
+          },
+          {
+            "id": 8,
+            "name": "Shift",
+            "key": "pad_trig_l"
+          },
+          {
+            "id": 9,
+            "name": "Ctrl",
+            "key": "pad_trig_r"
+          },
+          {
+            "id": 14,
+            "name": "Virtual Keyboard",
+            "key": "pad_btn_select"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "data": {
+    "magic": "APF_VER_1",
+    "data_slots": [
+      {
+        "name": "ROM Bundle",
+        "id": "0x200",
+        "required": true,
+        "deferload": true,
+        "parameters": 10,
+        "size_exact": "0x00028000",
+        "filename": "boot.rom",
+        "extensions": ["rom"],
+        "address": "0x00000000"
+      },
+      {
+        "name": "Drive A",
+        "id": "1",
+        "required": false,
+        "deferload": true,
+        "parameters": 9,
+        "filename": "",
+        "extensions": ["dsk"]
+      },
+      {
+        "name": "Drive B",
+        "id": "2",
+        "required": false,
+        "deferload": true,
+        "parameters": 9,
+        "filename": "",
+        "extensions": ["dsk"]
+      },
+      {
+        "name": "Tape",
+        "id": "3",
+        "required": false,
+        "deferload": true,
+        "parameters": 9,
+        "filename": "",
+        "extensions": ["cdt"]
+      },
+      {
+        "name": "Snapshot",
+        "id": "4",
+        "required": false,
+        "deferload": true,
+        "parameters": 9,
+        "filename": "",
+        "extensions": ["sna"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "video": {
+    "magic": "APF_VER_1",
+    "scaler_modes": [
+      {
+        "width": 768,
+        "height": 272,
+        "aspect_w": 4,
+        "aspect_h": 3,
+        "rotation": 0,
+        "mirror": 0
+      },
+      {
+        "width": 640,
+        "height": 200,
+        "aspect_w": 4,
+        "aspect_h": 3,
+        "rotation": 0,
+        "mirror": 0
+      },
+      {
+        "width": 696,
+        "height": 224,
+        "aspect_w": 4,
+        "aspect_h": 3,
+        "rotation": 0,
+        "mirror": 0
+      }
+    ],
+    "display_modes": [
+      {
+        "id": "0x10"
+      },
+      {
+        "id": "0x20"
+      },
+      {
+        "id": "0x30"
+      }
+    ]
+  }
+}

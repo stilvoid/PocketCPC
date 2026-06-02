@@ -1,0 +1,12 @@
+upstreams/
+build/
+dist/
+scripts/__pycache__/
+
+# Build outputs published through GitHub Releases should not be committed.
+releases/
+
+# Local assistant scratch space and tool-specific notes stay untracked.
+codex/
+.codex/
+.agents/
