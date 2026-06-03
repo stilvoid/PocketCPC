@@ -1,0 +1,32 @@
+{
+  "input": {
+    "magic": "APF_VER_1",
+    "controllers": [
+      {
+        "type": "default",
+        "mappings": [
+          {
+            "id": 0,
+            "name": "Joystick Fire 1",
+            "key": "pad_btn_a"
+          },
+          {
+            "id": 1,
+            "name": "Joystick Fire 2",
+            "key": "pad_btn_b"
+          },
+          {
+            "id": 2,
+            "name": "Virtual Keyboard",
+            "key": "pad_btn_select"
+          },
+          {
+            "id": 3,
+            "name": "Reset",
+            "key": "pad_btn_start"
+          }
+        ]
+      }
+    ]
+  }
+}
