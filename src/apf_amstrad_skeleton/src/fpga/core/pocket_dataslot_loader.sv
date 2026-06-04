@@ -15,6 +15,7 @@ module pocket_dataslot_loader #(
     parameter [31:0] TOTAL_BYTES = 32'h0000_c000
 ) (
     input  wire        clk,
+    input  wire        bridge_clk,
     input  wire        reset_n,
     input  wire        start,
 
@@ -79,7 +80,7 @@ bram_block_dp #(
     .DATA(32),
     .ADDR(8)
 ) bridge_ram (
-    .a_clk  ( clk ),
+    .a_clk  ( bridge_clk ),
     .a_wr   ( bridge_wr && (bridge_addr[31:28] == 4'h6) ),
     .a_addr ( bridge_addr[9:2] ),
     .a_din  ( {bridge_wr_data[7:0], bridge_wr_data[15:8], bridge_wr_data[23:16], bridge_wr_data[31:24]} ),

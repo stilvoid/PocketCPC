@@ -1,5 +1,12 @@
 # Implementation Plan
 
+## Reference-core rule
+
+Before implementing any phase, consult `docs/REFERENCE_CORE_STEERING.md`.
+Use the ZX Spectrum Pocket core for APF/Pocket mechanics and the MiSTer Amstrad
+CPC core for CPC machine behavior. New local HDL should be adapter code unless
+the relevant behavior is absent from both references.
+
 ## Phase 0: Local setup and audit
 
 1. Clone both upstream projects into `upstreams/`.
@@ -62,14 +69,16 @@ Exit criteria:
 
 ## Phase 4: Input
 
-1. Build CPC keyboard matrix adapter.
-2. Map Pocket buttons to joystick and common keys.
-3. Implement minimal virtual keyboard:
+1. Review MiSTer CPC keyboard/joystick matrix expectations.
+2. Review ZX Spectrum Pocket controller and virtual keyboard handling.
+3. Build CPC keyboard matrix adapter.
+4. Map Pocket buttons to joystick and common keys.
+5. Implement minimal virtual keyboard:
    - Select toggles keyboard overlay/mode.
    - D-pad moves selection.
    - A presses selected key.
    - X/Y or shoulder buttons toggle Shift/Ctrl as needed.
-4. Add quick mappings for common CPC actions:
+6. Add quick mappings for common CPC actions:
    - RUN/LOAD
    - Enter
    - Escape
@@ -83,11 +92,18 @@ Exit criteria:
 
 ## Phase 5: Video and audio
 
-1. Adapt CPC RGB output to Pocket `video_rgb`.
-2. Generate/align `video_rgb_clock` and `video_rgb_clock_90`.
-3. Wire `video_de`, `video_hs`, `video_vs`.
-4. Scale cleanly on Pocket screen, initially using one sensible mode.
-5. Wire PSG audio into Pocket DAC path. Confirm signed/unsigned expectation.
+1. Review MiSTer CPC `Amstrad.sv`, `color_mix`, and video timing before
+   changing CPC-side colour or pixel-enable behavior.
+2. Review ZX Spectrum Pocket `core_top.sv` video output wrapper and scaler JSON
+   before changing APF-facing video behavior.
+3. Preserve MiSTer CPC RGB/blank/sync generation wherever possible.
+4. Adapt CPC RGB output to Pocket `video_rgb` using ZX-style registered output.
+5. Generate/align `video_rgb_clock` and `video_rgb_clock_90` using the ZX
+   Pocket pattern where applicable.
+6. Wire `video_de`, `video_hs`, `video_vs`.
+7. Scale cleanly on Pocket screen, initially using one sensible mode.
+8. Wire PSG audio into Pocket DAC path. Confirm signed/unsigned expectation
+   against both the MiSTer PSG path and the Pocket audio wrapper pattern.
 
 Exit criteria:
 - Stable image.
@@ -96,11 +112,12 @@ Exit criteria:
 
 ## Phase 6: DSK read-only Drive A
 
-1. Identify MiSTer CPC DSK block path.
-2. Replace MiSTer sector request/ack transport with APF data-slot backed block cache.
-3. Support `.dsk` in Drive A.
-4. Make Drive B a stub until A works.
-5. Ignore writes initially or report write-protect.
+1. Identify MiSTer CPC DSK block path and preserve FDC/u765 behavior.
+2. Review ZX Spectrum Pocket media/data-slot loading patterns.
+3. Replace MiSTer sector request/ack transport with APF data-slot backed block cache.
+4. Support `.dsk` in Drive A.
+5. Make Drive B a stub until A works.
+6. Ignore writes initially or report write-protect.
 
 Exit criteria:
 - `CAT` lists a mounted DSK.

@@ -1,5 +1,10 @@
 # Codex Task List
 
+Global rule: follow `docs/REFERENCE_CORE_STEERING.md`. Reuse the ZX Spectrum
+Pocket core for Analogue Pocket/APF integration patterns, reuse MiSTer Amstrad
+CPC for CPC machine behavior, and keep new HDL limited to adapter glue unless a
+documented divergence is necessary.
+
 ## Task 1: Create repository skeleton
 
 - Create `openfpga-amstrad-cpc`.
@@ -45,6 +50,8 @@ Acceptance:
 
 ## Task 5: Keyboard and joystick
 
+- Preserve MiSTer CPC keyboard/joystick matrix expectations.
+- Use the ZX Spectrum Pocket controller and virtual keyboard patterns.
 - Implement CPC keyboard matrix adapter.
 - Map Pocket buttons to joystick.
 - Implement minimal virtual keyboard.
@@ -55,9 +62,12 @@ Acceptance:
 
 ## Task 6: Video/audio
 
-- Wire CPC video into APF video.
-- Wire AY/PSG audio into Pocket audio.
-- Remove unused MiSTer video filters for MVP.
+- Preserve MiSTer CPC colour, timing, and PSG behavior where possible.
+- Use ZX Spectrum Pocket APF video/audio output patterns.
+- Wire CPC video into APF video through a narrow registered adapter.
+- Wire AY/PSG audio into Pocket audio through a narrow adapter.
+- Remove unused MiSTer video filters for MVP only after confirming they are not
+  required for the current Pocket path.
 
 Acceptance:
 - Stable video and audible audio.
@@ -65,7 +75,8 @@ Acceptance:
 ## Task 7: Read-only DSK Drive A
 
 - Implement APF data-slot backed DSK cache.
-- Feed MiSTer CPC FDC sector interface.
+- Preserve and feed the MiSTer CPC FDC/u765 interface.
+- Use ZX Spectrum Pocket data-slot/media-loading patterns for APF transport.
 - Make write operations no-op/write-protected for MVP.
 
 Acceptance:

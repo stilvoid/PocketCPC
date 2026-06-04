@@ -216,16 +216,33 @@ assign aux_sda   = 1'bz;
 assign aux_scl   = 1'bz;
 assign vpll_feed = 1'b0;
 
-// The imported MiSTer CPC motherboard expects a 16 MHz gate-array enable.
-// Pocket's clk_74a is 74.25 MHz, so a /4 divider runs the CPC about 16% fast.
-localparam [31:0] CPC_CE_16_INC = 32'd925514838; // round(16e6 / 74.25e6 * 2^32)
-reg [31:0] cpc_ce_acc = 32'd0;
-reg        cpc_ce_16  = 1'b0;
-wire [32:0] cpc_ce_next = {1'b0, cpc_ce_acc} + {1'b0, CPC_CE_16_INC};
+wire cpc_clk;
+wire cpc_pll_locked;
+wire cpc_pll_locked_74;
+wire cpc_reset_n;
 
-always @(posedge clk_74a) begin
-    cpc_ce_acc <= cpc_ce_next[31:0];
-    cpc_ce_16  <= cpc_ce_next[32];
+cpc_pll cpc_pll_inst (
+    .refclk   ( clk_74a ),
+    .rst      ( 1'b0 ),
+    .outclk_0 ( cpc_clk ),
+    .locked   ( cpc_pll_locked )
+);
+
+synch_3 cpc_pll_lock_sync_74(cpc_pll_locked, cpc_pll_locked_74, clk_74a);
+synch_3 cpc_reset_sync(core_reset_n & cpc_pll_locked, cpc_reset_n, cpc_clk);
+
+// MiSTer runs the CPC from 64 MHz and derives a clean 16 MHz gate-array enable.
+reg [1:0]  cpc_div    = 2'd0;
+reg        cpc_ce_16  = 1'b0;
+
+always @(posedge cpc_clk) begin
+    if (!cpc_reset_n) begin
+        cpc_div   <= 2'd0;
+        cpc_ce_16 <= 1'b0;
+    end else begin
+        cpc_div   <= cpc_div + 2'd1;
+        cpc_ce_16 <= !cpc_div[1:0];
+    end
 end
 
 wire [23:0] cpc_rgb;
@@ -233,8 +250,13 @@ wire        cpc_hsync;
 wire        cpc_vsync;
 wire        cpc_hblank;
 wire        cpc_vblank;
+wire        cpc_rgb_hsync;
+wire        cpc_rgb_vsync;
+wire        cpc_rgb_hblank;
+wire        cpc_rgb_vblank;
 wire        cpc_video_phase_n;
 wire        cpc_video_phase_p;
+wire [1:0]  cpc_video_mode;
 wire [15:0] cpc_cpu_addr_debug;
 wire        cpc_mem_rd_debug;
 wire        cpc_mem_wr_debug;
@@ -246,13 +268,22 @@ wire        cpc_loader_error;
 wire [3:0]  cpc_loader_state;
 wire [31:0] cpc_loader_offset;
 wire        cpc_rom_loaded;
+wire        host_reset_n;
+wire        host_reset_n_cpc;
+wire [6:0]  cont1_joy_cpc;
+wire [6:0]  cont2_joy_cpc;
+
+synch_3 host_reset_sync_cpc(host_reset_n, host_reset_n_cpc, cpc_clk);
+synch_3 #(.WIDTH(7)) cont1_joy_sync_cpc(cont1_joy[6:0], cont1_joy_cpc, cpc_clk);
+synch_3 #(.WIDTH(7)) cont2_joy_sync_cpc(cont2_joy[6:0], cont2_joy_cpc, cpc_clk);
 
 cpc_machine_pocket cpc_machine (
-    .clk             ( clk_74a ),
-    .reset           ( !core_reset_n ),
+    .clk             ( cpc_clk ),
+    .reset           ( !cpc_reset_n ),
     .ce_16           ( cpc_ce_16 ),
-    .joy1            ( cont1_joy[6:0] ),
-    .joy2            ( cont2_joy[6:0] ),
+    .ce_pix          ( cpc_ce_16 ),
+    .joy1            ( 7'd0 ),
+    .joy2            ( 7'd0 ),
     .ps2_key         ( 11'd0 ),
     .loader_wr       ( cpc_loader_wr ),
     .loader_addr     ( cpc_loader_addr ),
@@ -265,8 +296,13 @@ cpc_machine_pocket cpc_machine (
     .vsync           ( cpc_vsync ),
     .hblank          ( cpc_hblank ),
     .vblank          ( cpc_vblank ),
+    .rgb_hsync       ( cpc_rgb_hsync ),
+    .rgb_vsync       ( cpc_rgb_vsync ),
+    .rgb_hblank      ( cpc_rgb_hblank ),
+    .rgb_vblank      ( cpc_rgb_vblank ),
     .video_phase_n   ( cpc_video_phase_n ),
     .video_phase_p   ( cpc_video_phase_p ),
+    .video_mode      ( cpc_video_mode ),
     .cpu_addr_debug  ( cpc_cpu_addr_debug ),
     .mem_rd_debug    ( cpc_mem_rd_debug ),
     .mem_wr_debug    ( cpc_mem_wr_debug )
@@ -286,57 +322,86 @@ localparam integer V_TOTAL   = V_VISIBLE + V_FRONT + V_SYNC + V_BACK;
 
 reg [9:0] h_count = 10'd0;
 reg [8:0] v_count = 9'd0;
-reg [3:0] pixel_div = 4'd0;
-reg       pixel_clk = 1'b0;
-reg       pixel_clk_90 = 1'b0;
-reg       cpc_pixel_clk = 1'b0;
-reg [5:0] cpc_pixel_clk_delay = 6'd0;
+reg [1:0] cpc_apf_counter = 2'd0;
+reg       cpc_apf_ce = 1'b0;
+reg       cpc_apf_pixel_clk = 1'b0;
+reg       cpc_apf_pixel_clk_90 = 1'b0;
 reg       cpc_native_de = 1'b0;
 reg       cpc_native_hs = 1'b0;
 reg       cpc_native_vs = 1'b0;
 reg [23:0] cpc_native_rgb = 24'h000000;
 reg       cpc_hsync_prev = 1'b0;
 reg       cpc_vsync_prev = 1'b0;
+reg [2:0] cpc_hsync_delay = 3'd0;
 
-always @(posedge clk_74a) begin
-    if (cpc_video_phase_n) begin
-        cpc_pixel_clk <= 1'b1;
+always @(posedge cpc_clk) begin
+    if (!cpc_reset_n) begin
+        cpc_apf_counter <= 2'd0;
+        cpc_apf_ce <= 1'b0;
+        cpc_apf_pixel_clk <= 1'b0;
+        cpc_apf_pixel_clk_90 <= 1'b0;
+    end else begin
+        cpc_apf_counter <= cpc_apf_counter + 2'd1;
+        cpc_apf_ce <= (cpc_apf_counter == 2'd0);
+
+        if (cpc_apf_counter == 2'd0) cpc_apf_pixel_clk <= 1'b1;
+        if (cpc_apf_counter == 2'd2) cpc_apf_pixel_clk <= 1'b0;
+
+        if (cpc_apf_counter == 2'd1) cpc_apf_pixel_clk_90 <= 1'b1;
+        if (cpc_apf_counter == 2'd3) cpc_apf_pixel_clk_90 <= 1'b0;
     end
-    if (cpc_video_phase_p) begin
-        cpc_pixel_clk <= 1'b0;
-
-        cpc_native_hs  <= !cpc_hsync_prev && cpc_hsync;
-        cpc_native_vs  <= !cpc_vsync_prev && cpc_vsync;
-        cpc_native_de  <= cpc_rom_loaded && !cpc_hblank && !cpc_vblank;
-        cpc_native_rgb <= (cpc_rom_loaded && !cpc_hblank && !cpc_vblank) ? cpc_rgb : 24'h000000;
-
-        cpc_hsync_prev <= cpc_hsync;
-        cpc_vsync_prev <= cpc_vsync;
-    end
-
-    cpc_pixel_clk_delay <= {cpc_pixel_clk_delay[4:0], cpc_pixel_clk};
 end
 
-always @(posedge clk_74a) begin
-    pixel_clk    <= (pixel_div < 4'd6);
-    pixel_clk_90 <= (pixel_div >= 4'd3) && (pixel_div < 4'd9);
-
-    if (pixel_div == 4'd11) begin
-        pixel_div <= 4'd0;
-
+always @(posedge cpc_clk) begin
+    if (!cpc_reset_n) begin
+        h_count <= 10'd0;
+        v_count <= 9'd0;
+    end else if (cpc_apf_ce && !cpc_rom_loaded) begin
         if (h_count == H_TOTAL - 1) begin
             h_count <= 10'd0;
 
-            if (v_count == V_TOTAL - 1) begin
-                v_count <= 9'd0;
-            end else begin
-                v_count <= v_count + 9'd1;
-            end
+            if (v_count == V_TOTAL - 1) v_count <= 9'd0;
+            else v_count <= v_count + 9'd1;
         end else begin
             h_count <= h_count + 10'd1;
         end
-    end else begin
-        pixel_div <= pixel_div + 4'd1;
+    end
+end
+
+always @(posedge cpc_clk) begin
+    if (!cpc_reset_n) begin
+        cpc_native_de <= 1'b0;
+        cpc_native_hs <= 1'b0;
+        cpc_native_vs <= 1'b0;
+        cpc_native_rgb <= 24'h000000;
+        cpc_hsync_prev <= 1'b0;
+        cpc_vsync_prev <= 1'b0;
+        cpc_hsync_delay <= 3'd0;
+    end else if (cpc_apf_ce) begin
+        cpc_native_de <= 1'b0;
+        cpc_native_hs <= 1'b0;
+        cpc_native_rgb <= 24'h000000;
+
+        if (cpc_rom_loaded && !cpc_rgb_hblank && !cpc_rgb_vblank) begin
+            cpc_native_de <= 1'b1;
+            cpc_native_rgb <= cpc_rgb;
+        end
+
+        if (cpc_hsync_delay != 3'd0) begin
+            cpc_hsync_delay <= cpc_hsync_delay - 3'd1;
+        end
+
+        if (cpc_hsync_delay == 3'd1) begin
+            cpc_native_hs <= 1'b1;
+        end
+
+        if (!cpc_hsync_prev && cpc_rgb_hsync) begin
+            cpc_hsync_delay <= 3'd7;
+        end
+
+        cpc_native_vs <= !cpc_vsync_prev && cpc_rgb_vsync;
+        cpc_hsync_prev <= cpc_rgb_hsync;
+        cpc_vsync_prev <= cpc_rgb_vsync;
     end
 end
 
@@ -371,8 +436,8 @@ assign video_de           = cpc_rom_loaded ? cpc_native_de : visible;
 assign video_skip         = 1'b0;
 assign video_hs           = cpc_rom_loaded ? cpc_native_hs : ~h_sync;
 assign video_vs           = cpc_rom_loaded ? cpc_native_vs : ~v_sync;
-assign video_rgb_clock    = cpc_rom_loaded ? cpc_pixel_clk : pixel_clk;
-assign video_rgb_clock_90 = cpc_rom_loaded ? cpc_pixel_clk_delay[4] : pixel_clk_90;
+assign video_rgb_clock    = cpc_apf_pixel_clk;
+assign video_rgb_clock_90 = cpc_apf_pixel_clk_90;
 
 reg [10:0] audio_div = 11'd0;
 reg        audio_lr  = 1'b0;
@@ -399,7 +464,6 @@ wire [31:0] loader_command;
 wire [31:0] bridge_status;
 wire [31:0] regs_bridge_rd_data;
 wire [31:0] cmd_bridge_rd_data;
-wire        host_reset_n;
 wire        savestate_start;
 wire        savestate_load;
 wire [9:0]  datatable_addr;
@@ -444,9 +508,10 @@ pocket_dataslot_loader #(
     .SLOT_ID     ( 16'h0200 ),
     .TOTAL_BYTES ( 32'h0000_c000 )
 ) rom_loader (
-    .clk                         ( clk_74a ),
-    .reset_n                     ( core_reset_n ),
-    .start                       ( host_reset_n ),
+    .clk                         ( cpc_clk ),
+    .bridge_clk                  ( clk_74a ),
+    .reset_n                     ( cpc_reset_n ),
+    .start                       ( host_reset_n_cpc ),
     .bridge_addr                 ( bridge_addr ),
     .bridge_wr                   ( bridge_wr ),
     .bridge_wr_data              ( bridge_wr_data ),
@@ -481,8 +546,8 @@ core_bridge_cmd cmd (
     .bridge_wr                   ( bridge_wr ),
     .bridge_wr_data              ( bridge_wr_data ),
 
-    .status_boot_done            ( core_reset_n ),
-    .status_setup_done           ( core_reset_n ),
+    .status_boot_done            ( core_reset_n & cpc_pll_locked_74 ),
+    .status_setup_done           ( core_reset_n & cpc_pll_locked_74 ),
     .status_running              ( host_reset_n ),
 
     .dataslot_requestread        ( ),
@@ -548,7 +613,7 @@ core_bridge_cmd cmd (
     .datatable_data              ( 32'd0 ),
     .datatable_q                 ( datatable_q ),
 
-    .i_clk_sync                  ( clk_74a ),
+    .i_clk_sync                  ( cpc_clk ),
     .i_write_strobe              ( loader_cmd_write_strobe ),
     .i_request_flag              ( loader_cmd_request_flag ),
 	    .o_ack_flag                  ( ),

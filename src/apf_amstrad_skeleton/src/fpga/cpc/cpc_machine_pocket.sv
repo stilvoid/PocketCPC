@@ -13,6 +13,7 @@ module cpc_machine_pocket (
     input  wire        clk,
     input  wire        reset,
     input  wire        ce_16,
+    input  wire        ce_pix,
 
     input  wire [6:0]  joy1,
     input  wire [6:0]  joy2,
@@ -30,8 +31,13 @@ module cpc_machine_pocket (
     output wire        vsync,
     output wire        hblank,
     output wire        vblank,
+    output wire        rgb_hsync,
+    output wire        rgb_vsync,
+    output wire        rgb_hblank,
+    output wire        rgb_vblank,
     output wire        video_phase_n,
     output wire        video_phase_p,
+    output wire [1:0]  video_mode,
     output wire [15:0] cpu_addr_debug,
     output wire        mem_rd_debug,
     output wire        mem_wr_debug
@@ -71,12 +77,10 @@ wire        cursor;
 wire [7:0]  rgb_r;
 wire [7:0]  rgb_g;
 wire [7:0]  rgb_b;
-wire        rgb_hsync;
-wire        rgb_vsync;
-wire        rgb_hblank;
-wire        rgb_vblank;
 
-localparam [3:0] CPC_DISTRIBUTOR_AMSTRAD = 4'b1000;
+// CPC6128 OS reads PPI port B bits 1..3 as active-low distributor jumpers.
+// On this wrapper, 4'b1111 selects the bundled ROM's "Amstrad" string.
+localparam [3:0] CPC_DISTRIBUTOR_AMSTRAD = 4'b1111;
 
 wire machine_reset = reset | key_reset | !rom_loaded;
 
@@ -85,6 +89,7 @@ assign mem_rd_debug   = mem_rd;
 assign mem_wr_debug   = mem_wr;
 assign video_phase_n  = phi_en_n;
 assign video_phase_p  = phi_en_p;
+assign video_mode     = mode;
 
 wire [7:0]  cpu_din;
 wire [15:0] vram_din;
@@ -96,6 +101,7 @@ cpc_ram_rom memory (
     .mem_addr     ( mem_addr ),
     .mem_rd       ( mem_rd ),
     .mem_wr       ( mem_wr ),
+    .cpu_io_rd    ( iorq & rd ),
     .cpu_dout     ( cpu_dout ),
     .cpu_din      ( cpu_din ),
     .vram_addr    ( vram_addr ),
@@ -193,7 +199,7 @@ Amstrad_motherboard motherboard (
 
 color_mix color_mix (
     .clk_vid    ( clk ),
-    .ce_pix     ( video_phase_p ),
+    .ce_pix     ( ce_pix ),
     .mix        ( 3'd0 ),
 
     .R_in       ( red ),

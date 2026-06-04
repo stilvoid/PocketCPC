@@ -19,6 +19,7 @@ module cpc_ram_rom (
     input  wire [22:0] mem_addr,
     input  wire        mem_rd,
     input  wire        mem_wr,
+    input  wire        cpu_io_rd,
     input  wire [7:0]  cpu_dout,
     output reg  [7:0]  cpu_din,
 
@@ -137,23 +138,28 @@ always @(posedge clk) begin
     end else if (loader_done && !loader_error) begin
         rom_loaded <= 1'b1;
         rom_map[ROM_SELECT_BASIC]  <= 1'b1;
-        rom_map[ROM_SELECT_AMSDOS] <= 1'b1;
+        // Keep AMSDOS hidden until the MiSTer FDC/u765 path is wired in.
+        rom_map[ROM_SELECT_AMSDOS] <= 1'b0;
     end
 end
 
 always @(*) begin
-    case (mem_page)
-        PAGE_ROM_OS:     cpu_din = rom_loaded ? rom_os_q     : 8'hff;
-        PAGE_ROM_BASIC:  cpu_din = rom_loaded ? rom_basic_q  : 8'hff;
-        PAGE_ROM_AMSDOS: cpu_din = rom_loaded ? rom_amsdos_q : 8'hff;
-        default: begin
-            if (ram_selected) begin
-                cpu_din = ram_addr[0] ? ram_cpu_odd_q : ram_cpu_even_q;
-            end else begin
-                cpu_din = 8'hff;
+    if (cpu_io_rd) begin
+        cpu_din = 8'hff;
+    end else begin
+        case (mem_page)
+            PAGE_ROM_OS:     cpu_din = rom_loaded ? rom_os_q     : 8'hff;
+            PAGE_ROM_BASIC:  cpu_din = rom_loaded ? rom_basic_q  : 8'hff;
+            PAGE_ROM_AMSDOS: cpu_din = rom_loaded ? rom_amsdos_q : 8'hff;
+            default: begin
+                if (ram_selected) begin
+                    cpu_din = ram_addr[0] ? ram_cpu_odd_q : ram_cpu_even_q;
+                end else begin
+                    cpu_din = 8'hff;
+                end
             end
-        end
-    endcase
+        endcase
+    end
 
     vram_din = {ram_vram_odd_q, ram_vram_even_q};
 end

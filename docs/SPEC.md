@@ -6,16 +6,25 @@ Create an Analogue Pocket/openFPGA core for the Amstrad CPC family, initially ta
 
 ## Feasibility position
 
+See `docs/REFERENCE_CORE_STEERING.md` for the binding reference-core reuse
+policy. The short version is: reuse MiSTer Amstrad for CPC behavior, reuse the
+ZX Spectrum Pocket core for Analogue Pocket/APF integration, and keep new local
+code limited to glue between those references.
+
 The ZX Spectrum Pocket core should be treated as a platform adaptation reference, not as the hardware base. The Spectrum +3 and CPC share historical Amstrad-era design influence and both use Z80-family architecture and 3-inch disk heritage, but the core logic is not interchangeable. The useful overlap is mostly:
 
 - Z80 CPU integration patterns.
 - FDC/disk lessons.
 - ROM asset packaging.
 - openFPGA bridge and controller wiring.
+- scaler/DDIO video output and registered RGB/DE/HS/VS patterns.
 - virtual keyboard/user-interface handling.
 - Quartus/openFPGA project structure.
 
-The CPC machine implementation should come from the MiSTer Amstrad core.
+The CPC machine implementation should come from the MiSTer Amstrad core. Any
+change to CPU timing, Gate Array, CRTC, colour generation, PSG, PPI, memory
+banking, FDC, tape, or model behavior should first look for the equivalent
+MiSTer implementation and preserve it wherever practical.
 
 ## MVP scope
 
@@ -58,6 +67,8 @@ The first useful build should support:
 - Analogue Pocket core top-level must expose APF physical/logical interfaces.
 - MiSTer `emu` top-level cannot be used directly.
 - MiSTer `hps_io`, OSD `status`, SD block I/O, PS/2 keyboard/mouse, and MiSTer video/audio outputs need replacement adapters.
+- Platform adapters should follow the ZX Spectrum Pocket core structure unless
+  there is a documented reason to diverge.
 - The first build should minimize dependencies on external RAM complexity by using BRAM where reasonable and only using PSRAM/SDRAM when required.
 - GPL source inheritance must be preserved if using MiSTer HDL.
 

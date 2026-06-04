@@ -10,13 +10,27 @@ This package is a planning and implementation handoff for porting the MiSTer Ams
 
 ## Intended approach
 
-Do not try to mutate the ZX Spectrum core into a CPC by changing machine internals. Use it as an openFPGA scaffold: APF top-level, bridge wiring, controller plumbing, Quartus project shape, memory-controller examples, virtual keyboard concept, and release layout.
+The standing rule is to reuse the two reference cores as much as possible and
+write new local HDL only for the boundary between them. See
+`docs/REFERENCE_CORE_STEERING.md` before making subsystem changes.
+
+Do not try to mutate the ZX Spectrum core into a CPC by changing machine internals. Use it as an openFPGA scaffold: APF top-level, bridge wiring, controller plumbing, Quartus project shape, memory-controller examples, scaler/DDIO video output patterns, asset/data-slot loading, virtual keyboard concept, and release layout.
 
 Use the MiSTer Amstrad core for the actual CPC implementation: Z80 timing, Gate Array, CRTC, PPI, PSG/audio, u765/FDC, DSK handling, tape/CDT loader, ROM loading, models, RAM banking, snapshots where feasible.
+
+When the two references overlap, prefer this split:
+
+- CPC machine behavior comes from MiSTer Amstrad.
+- Analogue Pocket/APF integration behavior comes from the ZX Spectrum Pocket
+  core.
+- PocketCPC-specific code should be narrow glue, with any intentional divergence
+  documented.
 
 ## Package contents
 
 - `docs/SPEC.md`: product and technical specification.
+- `docs/REFERENCE_CORE_STEERING.md`: reuse rules for the ZX Pocket and MiSTer
+  CPC reference cores.
 - `docs/IMPLEMENTATION_PLAN.md`: phased engineering plan.
 - `docs/COMPONENT_MAP.md`: which source project to take each subsystem from.
 - `docs/CPC_IMPORT_MANIFEST.md`: initial MiSTer CPC HDL import list and deferrals.
