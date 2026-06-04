@@ -6,22 +6,42 @@
         "type": "default",
         "mappings": [
           {
-            "id": 0,
-            "name": "Joystick Fire 1",
+            "id": 4,
+            "name": "Enter",
             "key": "pad_btn_a"
           },
           {
-            "id": 1,
-            "name": "Joystick Fire 2",
+            "id": 5,
+            "name": "Space",
             "key": "pad_btn_b"
           },
           {
-            "id": 2,
+            "id": 6,
+            "name": "Delete",
+            "key": "pad_btn_x"
+          },
+          {
+            "id": 7,
+            "name": "Escape",
+            "key": "pad_btn_y"
+          },
+          {
+            "id": 8,
+            "name": "Shift",
+            "key": "pad_trig_l"
+          },
+          {
+            "id": 9,
+            "name": "Ctrl",
+            "key": "pad_trig_r"
+          },
+          {
+            "id": 14,
             "name": "Virtual Keyboard",
             "key": "pad_btn_select"
           },
           {
-            "id": 3,
+            "id": 15,
             "name": "Reset",
             "key": "pad_btn_start"
           }

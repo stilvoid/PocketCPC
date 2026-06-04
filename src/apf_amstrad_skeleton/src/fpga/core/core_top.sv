@@ -270,21 +270,31 @@ wire [31:0] cpc_loader_offset;
 wire        cpc_rom_loaded;
 wire        host_reset_n;
 wire        host_reset_n_cpc;
-wire [6:0]  cont1_joy_cpc;
-wire [6:0]  cont2_joy_cpc;
+wire [31:0] cont1_key_cpc;
+wire [10:0] cpc_ps2_key;
+wire [6:0]  cpc_joy1;
+wire [6:0]  cpc_joy2;
 
 synch_3 host_reset_sync_cpc(host_reset_n, host_reset_n_cpc, cpc_clk);
-synch_3 #(.WIDTH(7)) cont1_joy_sync_cpc(cont1_joy[6:0], cont1_joy_cpc, cpc_clk);
-synch_3 #(.WIDTH(7)) cont2_joy_sync_cpc(cont2_joy[6:0], cont2_joy_cpc, cpc_clk);
+synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
+
+cpc_pocket_input cpc_input (
+    .clk       ( cpc_clk ),
+    .reset_n   ( cpc_reset_n ),
+    .cont1_key ( cont1_key_cpc ),
+    .ps2_key   ( cpc_ps2_key ),
+    .joy1      ( cpc_joy1 ),
+    .joy2      ( cpc_joy2 )
+);
 
 cpc_machine_pocket cpc_machine (
     .clk             ( cpc_clk ),
-    .reset           ( !cpc_reset_n ),
+    .reset           ( !cpc_reset_n | cont1_key_cpc[15] ),
     .ce_16           ( cpc_ce_16 ),
     .ce_pix          ( cpc_ce_16 ),
-    .joy1            ( 7'd0 ),
-    .joy2            ( 7'd0 ),
-    .ps2_key         ( 11'd0 ),
+    .joy1            ( cpc_joy1 ),
+    .joy2            ( cpc_joy2 ),
+    .ps2_key         ( cpc_ps2_key ),
     .loader_wr       ( cpc_loader_wr ),
     .loader_addr     ( cpc_loader_addr ),
     .loader_data     ( cpc_loader_data ),
