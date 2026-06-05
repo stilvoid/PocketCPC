@@ -459,6 +459,8 @@ cpc_virtual_keyboard_overlay cpc_vkb_overlay (
     .rgb_in         ( cpc_native_rgb ),
     .active         ( cpc_vkb_active & cpc_rom_loaded ),
     .selected_index ( cpc_vkb_index ),
+    .page           ( cpc_vkb_page ),
+    .shift_active   ( cpc_vkb_shift ),
     .rgb_out        ( cpc_overlay_rgb )
 );
 

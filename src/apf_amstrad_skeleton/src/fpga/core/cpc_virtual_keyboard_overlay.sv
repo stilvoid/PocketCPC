@@ -11,6 +11,8 @@ module cpc_virtual_keyboard_overlay (
     input  wire [23:0] rgb_in,
     input  wire        active,
     input  wire [5:0]  selected_index,
+    input  wire [1:0]  page,
+    input  wire        shift_active,
 
     output reg  [23:0] rgb_out
 );
@@ -36,6 +38,7 @@ wire [5:0] key_idx = ({4'd0, key_row} * 6'd10) + {2'd0, key_col};
 wire [5:0] local_x = band_x[5:0];
 wire [3:0] local_y = band_y[3:0];
 wire       selected = key_idx == selected_index;
+wire       shift_cell = (page == 2'd1) && (key_idx == 6'd4);
 wire       border = (local_x == 6'd0) || (local_x == 6'd63) ||
                     (local_y == 4'd0) || (local_y == 4'd15);
 wire [5:0] glyph_x_off = local_x - GLYPH_X;
@@ -45,54 +48,120 @@ wire       glyph_region = (local_x >= GLYPH_X) && (local_x < GLYPH_X + 6'd10) &&
                           (local_y >= GLYPH_Y) && (local_y < GLYPH_Y + 4'd14);
 wire [2:0] glyph_col = glyph_x_off[3:1];
 wire [2:0] glyph_row = glyph_y_off[3:1];
-wire [7:0] glyph_char = key_index_to_char(key_idx);
+wire [7:0] glyph_char = key_index_to_char(key_idx, page);
 wire [4:0] glyph_bits = glyph_row_bits(glyph_char, glyph_row);
 wire       glyph_on = glyph_region && glyph_bits[3'd4 - glyph_col];
+wire [23:0] key_fill = (shift_active && shift_cell) ? 24'h604800 : 24'h202020;
+wire [23:0] key_border = (shift_active && shift_cell) ? 24'hffd000 : 24'h606060;
+
+reg        in_band_r = 1'b0;
+reg        glyph_on_r = 1'b0;
+reg        selected_r = 1'b0;
+reg        border_r = 1'b0;
+reg [23:0] key_fill_r = 24'h202020;
+reg [23:0] key_border_r = 24'h606060;
+reg [23:0] rgb_in_r = 24'h000000;
 
 function [7:0] key_index_to_char;
     input [5:0] key_index;
+    input [1:0] key_page;
     begin
-        case (key_index)
-            6'd0:  key_index_to_char = 8'h31;
-            6'd1:  key_index_to_char = 8'h32;
-            6'd2:  key_index_to_char = 8'h33;
-            6'd3:  key_index_to_char = 8'h34;
-            6'd4:  key_index_to_char = 8'h35;
-            6'd5:  key_index_to_char = 8'h36;
-            6'd6:  key_index_to_char = 8'h37;
-            6'd7:  key_index_to_char = 8'h38;
-            6'd8:  key_index_to_char = 8'h39;
-            6'd9:  key_index_to_char = 8'h30;
-            6'd10: key_index_to_char = 8'h51;
-            6'd11: key_index_to_char = 8'h57;
-            6'd12: key_index_to_char = 8'h45;
-            6'd13: key_index_to_char = 8'h52;
-            6'd14: key_index_to_char = 8'h54;
-            6'd15: key_index_to_char = 8'h59;
-            6'd16: key_index_to_char = 8'h55;
-            6'd17: key_index_to_char = 8'h49;
-            6'd18: key_index_to_char = 8'h4F;
-            6'd19: key_index_to_char = 8'h50;
-            6'd20: key_index_to_char = 8'h41;
-            6'd21: key_index_to_char = 8'h53;
-            6'd22: key_index_to_char = 8'h44;
-            6'd23: key_index_to_char = 8'h46;
-            6'd24: key_index_to_char = 8'h47;
-            6'd25: key_index_to_char = 8'h48;
-            6'd26: key_index_to_char = 8'h4A;
-            6'd27: key_index_to_char = 8'h4B;
-            6'd28: key_index_to_char = 8'h4C;
-            6'd29: key_index_to_char = 8'h3B;
-            6'd30: key_index_to_char = 8'h5A;
-            6'd31: key_index_to_char = 8'h58;
-            6'd32: key_index_to_char = 8'h43;
-            6'd33: key_index_to_char = 8'h56;
-            6'd34: key_index_to_char = 8'h42;
-            6'd35: key_index_to_char = 8'h4E;
-            6'd36: key_index_to_char = 8'h4D;
-            6'd37: key_index_to_char = 8'h2C;
-            6'd38: key_index_to_char = 8'h2E;
-            6'd39: key_index_to_char = 8'h2F;
+        key_index_to_char = 8'h20;
+        case (key_page)
+            2'd0: begin
+                case (key_index)
+                    6'd0:  key_index_to_char = 8'h31;
+                    6'd1:  key_index_to_char = 8'h32;
+                    6'd2:  key_index_to_char = 8'h33;
+                    6'd3:  key_index_to_char = 8'h34;
+                    6'd4:  key_index_to_char = 8'h35;
+                    6'd5:  key_index_to_char = 8'h36;
+                    6'd6:  key_index_to_char = 8'h37;
+                    6'd7:  key_index_to_char = 8'h38;
+                    6'd8:  key_index_to_char = 8'h39;
+                    6'd9:  key_index_to_char = 8'h30;
+                    6'd10: key_index_to_char = 8'h51;
+                    6'd11: key_index_to_char = 8'h57;
+                    6'd12: key_index_to_char = 8'h45;
+                    6'd13: key_index_to_char = 8'h52;
+                    6'd14: key_index_to_char = 8'h54;
+                    6'd15: key_index_to_char = 8'h59;
+                    6'd16: key_index_to_char = 8'h55;
+                    6'd17: key_index_to_char = 8'h49;
+                    6'd18: key_index_to_char = 8'h4F;
+                    6'd19: key_index_to_char = 8'h50;
+                    6'd20: key_index_to_char = 8'h41;
+                    6'd21: key_index_to_char = 8'h53;
+                    6'd22: key_index_to_char = 8'h44;
+                    6'd23: key_index_to_char = 8'h46;
+                    6'd24: key_index_to_char = 8'h47;
+                    6'd25: key_index_to_char = 8'h48;
+                    6'd26: key_index_to_char = 8'h4A;
+                    6'd27: key_index_to_char = 8'h4B;
+                    6'd28: key_index_to_char = 8'h4C;
+                    6'd29: key_index_to_char = 8'h3A;
+                    6'd30: key_index_to_char = 8'h5A;
+                    6'd31: key_index_to_char = 8'h58;
+                    6'd32: key_index_to_char = 8'h43;
+                    6'd33: key_index_to_char = 8'h56;
+                    6'd34: key_index_to_char = 8'h42;
+                    6'd35: key_index_to_char = 8'h4E;
+                    6'd36: key_index_to_char = 8'h4D;
+                    6'd37: key_index_to_char = 8'h2C;
+                    6'd38: key_index_to_char = 8'h2E;
+                    6'd39: key_index_to_char = 8'h2F;
+                    default: key_index_to_char = 8'h20;
+                endcase
+            end
+            2'd1: begin
+                case (key_index)
+                    6'd0:  key_index_to_char = 8'h45; // Esc
+                    6'd1:  key_index_to_char = 8'h54; // Tab
+                    6'd2:  key_index_to_char = 8'h4B; // Caps
+                    6'd3:  key_index_to_char = 8'h43; // Ctrl
+                    6'd4:  key_index_to_char = 8'h53; // Shift
+                    6'd5:  key_index_to_char = 8'h52; // Return
+                    6'd6:  key_index_to_char = 8'h44; // Del
+                    6'd7:  key_index_to_char = 8'h20; // Space
+                    6'd8:  key_index_to_char = 8'h50; // Copy
+                    6'd9:  key_index_to_char = 8'h4C; // CLR
+                    6'd10: key_index_to_char = 8'h40;
+                    6'd11: key_index_to_char = 8'h5B;
+                    6'd12: key_index_to_char = 8'h5D;
+                    6'd13: key_index_to_char = 8'h5C;
+                    6'd14: key_index_to_char = 8'h2D;
+                    6'd15: key_index_to_char = 8'h2B;
+                    6'd16: key_index_to_char = 8'h3B;
+                    6'd17: key_index_to_char = 8'h3A;
+                    6'd18: key_index_to_char = 8'h2F;
+                    6'd19: key_index_to_char = 8'h2E;
+                    6'd20: key_index_to_char = 8'h2C;
+                    default: key_index_to_char = 8'h20;
+                endcase
+            end
+            2'd2: begin
+                case (key_index)
+                    6'd0:  key_index_to_char = 8'h30; // F0
+                    6'd1:  key_index_to_char = 8'h31; // F1
+                    6'd2:  key_index_to_char = 8'h32; // F2
+                    6'd3:  key_index_to_char = 8'h33; // F3
+                    6'd4:  key_index_to_char = 8'h34; // F4
+                    6'd5:  key_index_to_char = 8'h35; // F5
+                    6'd6:  key_index_to_char = 8'h36; // F6
+                    6'd7:  key_index_to_char = 8'h37; // F7
+                    6'd8:  key_index_to_char = 8'h38; // F8
+                    6'd9:  key_index_to_char = 8'h39; // F9
+                    6'd10: key_index_to_char = 8'h55; // Up
+                    6'd11: key_index_to_char = 8'h4C; // Left
+                    6'd12: key_index_to_char = 8'h44; // Down
+                    6'd13: key_index_to_char = 8'h52; // Right
+                    6'd14: key_index_to_char = 8'h45; // keypad Enter
+                    6'd15: key_index_to_char = 8'h2E; // keypad .
+                    6'd16: key_index_to_char = 8'h50; // Copy
+                    6'd17: key_index_to_char = 8'h43; // CLR
+                    default: key_index_to_char = 8'h20;
+                endcase
+            end
             default: key_index_to_char = 8'h20;
         endcase
     end
@@ -114,6 +183,8 @@ function [4:0] glyph_row_bits;
             8'h37: case (row) 3'd0: glyph_row_bits = 5'b11111; 3'd1: glyph_row_bits = 5'b00001; 3'd2: glyph_row_bits = 5'b00010; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b01000; 3'd5: glyph_row_bits = 5'b01000; 3'd6: glyph_row_bits = 5'b01000; default: glyph_row_bits = 5'b00000; endcase
             8'h38: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10001; 3'd3: glyph_row_bits = 5'b01110; 3'd4: glyph_row_bits = 5'b10001; 3'd5: glyph_row_bits = 5'b10001; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
             8'h39: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10001; 3'd3: glyph_row_bits = 5'b01111; 3'd4: glyph_row_bits = 5'b00001; 3'd5: glyph_row_bits = 5'b00001; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
+            8'h2B: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b11111; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b00000; default: glyph_row_bits = 5'b00000; endcase
+            8'h2D: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00000; 3'd2: glyph_row_bits = 5'b00000; 3'd3: glyph_row_bits = 5'b11111; 3'd4: glyph_row_bits = 5'b00000; 3'd5: glyph_row_bits = 5'b00000; 3'd6: glyph_row_bits = 5'b00000; default: glyph_row_bits = 5'b00000; endcase
             8'h41: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10001; 3'd3: glyph_row_bits = 5'b11111; 3'd4: glyph_row_bits = 5'b10001; 3'd5: glyph_row_bits = 5'b10001; 3'd6: glyph_row_bits = 5'b10001; default: glyph_row_bits = 5'b00000; endcase
             8'h42: case (row) 3'd0: glyph_row_bits = 5'b11110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10001; 3'd3: glyph_row_bits = 5'b11110; 3'd4: glyph_row_bits = 5'b10001; 3'd5: glyph_row_bits = 5'b10001; 3'd6: glyph_row_bits = 5'b11110; default: glyph_row_bits = 5'b00000; endcase
             8'h43: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10000; 3'd3: glyph_row_bits = 5'b10000; 3'd4: glyph_row_bits = 5'b10000; 3'd5: glyph_row_bits = 5'b10001; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
@@ -141,9 +212,14 @@ function [4:0] glyph_row_bits;
             8'h59: case (row) 3'd0: glyph_row_bits = 5'b10001; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b01010; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b00100; default: glyph_row_bits = 5'b00000; endcase
             8'h5A: case (row) 3'd0: glyph_row_bits = 5'b11111; 3'd1: glyph_row_bits = 5'b00001; 3'd2: glyph_row_bits = 5'b00010; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b01000; 3'd5: glyph_row_bits = 5'b10000; 3'd6: glyph_row_bits = 5'b11111; default: glyph_row_bits = 5'b00000; endcase
             8'h3B: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b00000; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b01000; default: glyph_row_bits = 5'b00000; endcase
+            8'h3A: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b00000; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b00000; default: glyph_row_bits = 5'b00000; endcase
             8'h2C: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00000; 3'd2: glyph_row_bits = 5'b00000; 3'd3: glyph_row_bits = 5'b00000; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b01000; default: glyph_row_bits = 5'b00000; endcase
             8'h2E: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00000; 3'd2: glyph_row_bits = 5'b00000; 3'd3: glyph_row_bits = 5'b00000; 3'd4: glyph_row_bits = 5'b00000; 3'd5: glyph_row_bits = 5'b01100; 3'd6: glyph_row_bits = 5'b01100; default: glyph_row_bits = 5'b00000; endcase
             8'h2F: case (row) 3'd0: glyph_row_bits = 5'b00001; 3'd1: glyph_row_bits = 5'b00010; 3'd2: glyph_row_bits = 5'b00010; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b01000; 3'd5: glyph_row_bits = 5'b01000; 3'd6: glyph_row_bits = 5'b10000; default: glyph_row_bits = 5'b00000; endcase
+            8'h40: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10111; 3'd3: glyph_row_bits = 5'b10101; 3'd4: glyph_row_bits = 5'b10111; 3'd5: glyph_row_bits = 5'b10000; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
+            8'h5B: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b01000; 3'd2: glyph_row_bits = 5'b01000; 3'd3: glyph_row_bits = 5'b01000; 3'd4: glyph_row_bits = 5'b01000; 3'd5: glyph_row_bits = 5'b01000; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
+            8'h5C: case (row) 3'd0: glyph_row_bits = 5'b10000; 3'd1: glyph_row_bits = 5'b01000; 3'd2: glyph_row_bits = 5'b01000; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b00010; 3'd5: glyph_row_bits = 5'b00010; 3'd6: glyph_row_bits = 5'b00001; default: glyph_row_bits = 5'b00000; endcase
+            8'h5D: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b00010; 3'd2: glyph_row_bits = 5'b00010; 3'd3: glyph_row_bits = 5'b00010; 3'd4: glyph_row_bits = 5'b00010; 3'd5: glyph_row_bits = 5'b00010; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
             default: glyph_row_bits = 5'b00000;
         endcase
     end
@@ -151,11 +227,18 @@ endfunction
 
 always @(posedge clk) begin
     if (!reset_n) begin
-        x        <= 10'd0;
-        y        <= 9'd0;
-        de_prev  <= 1'b0;
-        vs_prev  <= 1'b0;
-        rgb_out  <= 24'h000000;
+        x            <= 10'd0;
+        y            <= 9'd0;
+        de_prev      <= 1'b0;
+        vs_prev      <= 1'b0;
+        in_band_r    <= 1'b0;
+        glyph_on_r   <= 1'b0;
+        selected_r   <= 1'b0;
+        border_r     <= 1'b0;
+        key_fill_r   <= 24'h202020;
+        key_border_r <= 24'h606060;
+        rgb_in_r     <= 24'h000000;
+        rgb_out      <= 24'h000000;
     end else if (ce) begin
         if (!vs_prev && vs) begin
             y <= 9'd0;
@@ -171,10 +254,18 @@ always @(posedge clk) begin
         de_prev <= de;
         vs_prev <= vs;
 
-        if (in_band && glyph_on) rgb_out <= selected ? 24'h000000 : 24'hffffff;
-        else if (in_band && border) rgb_out <= selected ? 24'hffffff : 24'h606060;
-        else if (in_band) rgb_out <= selected ? 24'hffd000 : 24'h202020;
-        else rgb_out <= rgb_in;
+        in_band_r    <= in_band;
+        glyph_on_r   <= glyph_on;
+        selected_r   <= selected;
+        border_r     <= border;
+        key_fill_r   <= key_fill;
+        key_border_r <= key_border;
+        rgb_in_r     <= rgb_in;
+
+        if (in_band_r && glyph_on_r) rgb_out <= selected_r ? 24'h000000 : 24'hffffff;
+        else if (in_band_r && border_r) rgb_out <= selected_r ? 24'hffffff : key_border_r;
+        else if (in_band_r) rgb_out <= selected_r ? 24'hffd000 : key_fill_r;
+        else rgb_out <= rgb_in_r;
     end
 end
 
