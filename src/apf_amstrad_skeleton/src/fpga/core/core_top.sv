@@ -276,6 +276,8 @@ wire [6:0]  cpc_joy1;
 wire [6:0]  cpc_joy2;
 wire        cpc_vkb_active;
 wire [5:0]  cpc_vkb_index;
+wire [1:0]  cpc_vkb_page;
+wire        cpc_vkb_shift;
 
 synch_3 host_reset_sync_cpc(host_reset_n, host_reset_n_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
@@ -288,7 +290,9 @@ cpc_pocket_input cpc_input (
     .joy1      ( cpc_joy1 ),
     .joy2      ( cpc_joy2 ),
     .vkb_active( cpc_vkb_active ),
-    .vkb_index ( cpc_vkb_index )
+    .vkb_index ( cpc_vkb_index ),
+    .vkb_page  ( cpc_vkb_page ),
+    .vkb_shift ( cpc_vkb_shift )
 );
 
 cpc_machine_pocket cpc_machine (
