@@ -11,6 +11,9 @@ module cpc_pocket_input (
     input  wire        clk,
     input  wire        reset_n,
     input  wire [31:0] cont1_key,
+    input  wire [31:0] cont3_key,
+    input  wire [31:0] cont3_joy,
+    input  wire [15:0] cont3_trig,
 
     output reg  [10:0] ps2_key,
     output wire [6:0]  joy1,
@@ -22,14 +25,27 @@ module cpc_pocket_input (
 );
 
 localparam [7:0] PS2_LSHIFT = 8'h12;
+localparam [7:0] PS2_CTRL   = 8'h14;
 
 wire [15:0] buttons = cont1_key[15:0];
 wire [15:0] changed = buttons ^ buttons_prev;
 wire [15:0] pressed = buttons & ~buttons_prev;
+wire        dock_keyboard_active = cont3_key[31:28] == 4'h4;
+wire [15:0] dock_keyboard_mods = dock_keyboard_active ? (cont3_key[15:0] & 16'h0033) : 16'd0;
+wire [47:0] dock_keyboard_codes = dock_keyboard_active ? {
+    cont3_joy[31:24],
+    cont3_joy[23:16],
+    cont3_joy[15:8],
+    cont3_joy[7:0],
+    cont3_trig[15:8],
+    cont3_trig[7:0]
+} : 48'd0;
 
 reg [15:0] buttons_prev = 16'd0;
 reg [15:0] pending      = 16'd0;
 reg [8:0]  vkb_a_ps2    = {1'b0, 8'h16};
+reg [15:0] dock_keyboard_mods_active = 16'd0;
+reg [47:0] dock_keyboard_codes_active = 48'd0;
 
 // Leave joystick lines idle for this first keyboard-focused input path. The
 // Pocket buttons below are presented as CPC keyboard keys instead.
@@ -140,6 +156,157 @@ function [9:0] map_vkb_index_to_ps2;
     end
 endfunction
 
+function automatic [7:0] dock_keyboard_code_at;
+    input [47:0] report;
+    input [2:0] index;
+    begin
+        case (index)
+            3'd0: dock_keyboard_code_at = report[47:40];
+            3'd1: dock_keyboard_code_at = report[39:32];
+            3'd2: dock_keyboard_code_at = report[31:24];
+            3'd3: dock_keyboard_code_at = report[23:16];
+            3'd4: dock_keyboard_code_at = report[15:8];
+            3'd5: dock_keyboard_code_at = report[7:0];
+            default: dock_keyboard_code_at = 8'd0;
+        endcase
+    end
+endfunction
+
+function automatic dock_keyboard_code_present;
+    input [7:0] code;
+    input [47:0] report;
+    integer idx;
+    begin
+        dock_keyboard_code_present = 1'b0;
+        if (code != 8'd0) begin
+            for (idx = 0; idx < 6; idx = idx + 1) begin
+                if (dock_keyboard_code_at(report, idx[2:0]) == code) begin
+                    dock_keyboard_code_present = 1'b1;
+                end
+            end
+        end
+    end
+endfunction
+
+function automatic [47:0] dock_keyboard_add_code;
+    input [47:0] report;
+    input [7:0] code;
+    begin
+        dock_keyboard_add_code = report;
+        if (report[47:40] == 8'd0) dock_keyboard_add_code[47:40] = code;
+        else if (report[39:32] == 8'd0) dock_keyboard_add_code[39:32] = code;
+        else if (report[31:24] == 8'd0) dock_keyboard_add_code[31:24] = code;
+        else if (report[23:16] == 8'd0) dock_keyboard_add_code[23:16] = code;
+        else if (report[15:8] == 8'd0) dock_keyboard_add_code[15:8] = code;
+        else if (report[7:0] == 8'd0) dock_keyboard_add_code[7:0] = code;
+    end
+endfunction
+
+function automatic [47:0] dock_keyboard_remove_code;
+    input [47:0] report;
+    input [7:0] code;
+    begin
+        dock_keyboard_remove_code = report;
+        if (report[47:40] == code) dock_keyboard_remove_code[47:40] = 8'd0;
+        if (report[39:32] == code) dock_keyboard_remove_code[39:32] = 8'd0;
+        if (report[31:24] == code) dock_keyboard_remove_code[31:24] = 8'd0;
+        if (report[23:16] == code) dock_keyboard_remove_code[23:16] = 8'd0;
+        if (report[15:8] == code) dock_keyboard_remove_code[15:8] = 8'd0;
+        if (report[7:0] == code) dock_keyboard_remove_code[7:0] = 8'd0;
+    end
+endfunction
+
+function automatic [9:0] map_usb_hid_to_ps2;
+    input [7:0] hid_code;
+    begin
+        map_usb_hid_to_ps2 = 10'd0;
+        case (hid_code)
+            8'h04: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h1C}; // A
+            8'h05: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h32}; // B
+            8'h06: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h21}; // C
+            8'h07: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h23}; // D
+            8'h08: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h24}; // E
+            8'h09: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h2B}; // F
+            8'h0A: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h34}; // G
+            8'h0B: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h33}; // H
+            8'h0C: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h43}; // I
+            8'h0D: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h3B}; // J
+            8'h0E: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h42}; // K
+            8'h0F: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h4B}; // L
+            8'h10: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h3A}; // M
+            8'h11: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h31}; // N
+            8'h12: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h44}; // O
+            8'h13: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h4D}; // P
+            8'h14: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h15}; // Q
+            8'h15: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h2D}; // R
+            8'h16: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h1B}; // S
+            8'h17: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h2C}; // T
+            8'h18: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h3C}; // U
+            8'h19: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h2A}; // V
+            8'h1A: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h1D}; // W
+            8'h1B: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h22}; // X
+            8'h1C: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h35}; // Y
+            8'h1D: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h1A}; // Z
+            8'h1E: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h16}; // 1
+            8'h1F: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h1E}; // 2
+            8'h20: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h26}; // 3
+            8'h21: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h25}; // 4
+            8'h22: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h2E}; // 5
+            8'h23: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h36}; // 6
+            8'h24: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h3D}; // 7
+            8'h25: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h3E}; // 8
+            8'h26: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h46}; // 9
+            8'h27: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h45}; // 0
+            8'h28: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h5A}; // Enter
+            8'h29: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h76}; // Escape
+            8'h2A: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h66}; // Backspace
+            8'h2B: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h0D}; // Tab
+            8'h2C: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h29}; // Space
+            8'h2D: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h4E}; // -
+            8'h2E: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h55}; // =
+            8'h2F: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h54}; // [
+            8'h30: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h5B}; // ]
+            8'h31: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h5D}; // backslash
+            8'h33: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h4C}; // ;
+            8'h34: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h52}; // quote
+            8'h36: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
+            8'h37: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
+            8'h38: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
+            8'h39: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h58}; // Caps Lock
+            8'h3A: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h05}; // F1
+            8'h3B: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h06}; // F2
+            8'h3C: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h04}; // F3
+            8'h3D: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h0C}; // F4
+            8'h3E: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h03}; // F5
+            8'h3F: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h0B}; // F6
+            8'h40: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h83}; // F7
+            8'h41: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h0A}; // F8
+            8'h42: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h01}; // F9
+            8'h43: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h09}; // F10 -> CPC F0
+            8'h4C: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h71}; // Delete
+            8'h4F: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h74}; // Right
+            8'h50: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h6B}; // Left
+            8'h51: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h72}; // Down
+            8'h52: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h75}; // Up
+            default: map_usb_hid_to_ps2 = 10'd0;
+        endcase
+    end
+endfunction
+
+function automatic [9:0] map_dock_modifier_to_ps2;
+    input [3:0] mod_index;
+    begin
+        map_dock_modifier_to_ps2 = 10'd0;
+        case (mod_index)
+            4'd0: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};
+            4'd1: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT};
+            4'd4: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};
+            4'd5: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT};
+            default: map_dock_modifier_to_ps2 = 10'd0;
+        endcase
+    end
+endfunction
+
 function [9:0] map_normal_button_to_ps2;
     input [3:0] button;
     begin
@@ -185,7 +352,16 @@ reg [15:0] next_pending;
 reg [3:0]  selected_button;
 reg [9:0]  selected_ps2;
 reg        selected_valid;
+reg [9:0]  dock_selected_ps2;
+reg        dock_selected_valid;
+reg        dock_selected_pressed;
+reg        dock_selected_is_modifier;
+reg [3:0]  dock_selected_modifier;
+reg [7:0]  dock_selected_code;
 integer    scan_idx;
+integer    dock_scan_idx;
+reg [15:0] dock_modifier_delta;
+reg [7:0]  dock_scan_code;
 
 always @(*) begin
     next_pending    = pending | changed;
@@ -226,6 +402,57 @@ always @(*) begin
     end
 end
 
+always @(*) begin
+    dock_selected_ps2         = 10'd0;
+    dock_selected_valid       = 1'b0;
+    dock_selected_pressed     = 1'b0;
+    dock_selected_is_modifier = 1'b0;
+    dock_selected_modifier    = 4'd0;
+    dock_selected_code        = 8'd0;
+    dock_modifier_delta       = dock_keyboard_mods ^ dock_keyboard_mods_active;
+    dock_scan_code            = 8'd0;
+
+    for (dock_scan_idx = 0; dock_scan_idx < 16; dock_scan_idx = dock_scan_idx + 1) begin
+        if (dock_modifier_delta[dock_scan_idx] && !dock_selected_valid) begin
+            dock_selected_ps2 = map_dock_modifier_to_ps2(dock_scan_idx[3:0]);
+            if (dock_selected_ps2[9]) begin
+                dock_selected_valid       = 1'b1;
+                dock_selected_pressed     = dock_keyboard_mods[dock_scan_idx];
+                dock_selected_is_modifier = 1'b1;
+                dock_selected_modifier    = dock_scan_idx[3:0];
+            end
+        end
+    end
+
+    for (dock_scan_idx = 0; dock_scan_idx < 6; dock_scan_idx = dock_scan_idx + 1) begin
+        dock_scan_code = dock_keyboard_code_at(dock_keyboard_codes_active, dock_scan_idx[2:0]);
+        if ((dock_scan_code != 8'd0) &&
+            !dock_keyboard_code_present(dock_scan_code, dock_keyboard_codes) &&
+            !dock_selected_valid) begin
+            dock_selected_ps2 = map_usb_hid_to_ps2(dock_scan_code);
+            if (dock_selected_ps2[9]) begin
+                dock_selected_valid   = 1'b1;
+                dock_selected_pressed = 1'b0;
+                dock_selected_code    = dock_scan_code;
+            end
+        end
+    end
+
+    for (dock_scan_idx = 0; dock_scan_idx < 6; dock_scan_idx = dock_scan_idx + 1) begin
+        dock_scan_code = dock_keyboard_code_at(dock_keyboard_codes, dock_scan_idx[2:0]);
+        if ((dock_scan_code != 8'd0) &&
+            !dock_keyboard_code_present(dock_scan_code, dock_keyboard_codes_active) &&
+            !dock_selected_valid) begin
+            dock_selected_ps2 = map_usb_hid_to_ps2(dock_scan_code);
+            if (dock_selected_ps2[9]) begin
+                dock_selected_valid   = 1'b1;
+                dock_selected_pressed = 1'b1;
+                dock_selected_code    = dock_scan_code;
+            end
+        end
+    end
+end
+
 always @(posedge clk) begin
     if (!reset_n) begin
         buttons_prev <= 16'd0;
@@ -236,6 +463,8 @@ always @(posedge clk) begin
         vkb_page     <= 2'd0;
         vkb_shift    <= 1'b0;
         vkb_a_ps2    <= {1'b0, 8'h16};
+        dock_keyboard_mods_active  <= 16'd0;
+        dock_keyboard_codes_active <= 48'd0;
     end else begin
         buttons_prev <= buttons;
         pending      <= next_pending;
@@ -292,6 +521,21 @@ always @(posedge clk) begin
                 selected_ps2[8],
                 selected_ps2[7:0]
             };
+        end else if (dock_selected_valid) begin
+            ps2_key <= {
+                ~ps2_key[10],
+                dock_selected_pressed,
+                dock_selected_ps2[8],
+                dock_selected_ps2[7:0]
+            };
+
+            if (dock_selected_is_modifier) begin
+                dock_keyboard_mods_active[dock_selected_modifier] <= dock_selected_pressed;
+            end else if (dock_selected_pressed) begin
+                dock_keyboard_codes_active <= dock_keyboard_add_code(dock_keyboard_codes_active, dock_selected_code);
+            end else begin
+                dock_keyboard_codes_active <= dock_keyboard_remove_code(dock_keyboard_codes_active, dock_selected_code);
+            end
         end
     end
 end

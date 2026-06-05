@@ -271,6 +271,9 @@ wire        cpc_rom_loaded;
 wire        host_reset_n;
 wire        host_reset_n_cpc;
 wire [31:0] cont1_key_cpc;
+wire [31:0] cont3_key_cpc;
+wire [31:0] cont3_joy_cpc;
+wire [15:0] cont3_trig_cpc;
 wire [10:0] cpc_ps2_key;
 wire [6:0]  cpc_joy1;
 wire [6:0]  cpc_joy2;
@@ -281,11 +284,17 @@ wire        cpc_vkb_shift;
 
 synch_3 host_reset_sync_cpc(host_reset_n, host_reset_n_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
+synch_3 #(.WIDTH(32)) cont3_key_sync_cpc(cont3_key, cont3_key_cpc, cpc_clk);
+synch_3 #(.WIDTH(32)) cont3_joy_sync_cpc(cont3_joy, cont3_joy_cpc, cpc_clk);
+synch_3 #(.WIDTH(16)) cont3_trig_sync_cpc(cont3_trig, cont3_trig_cpc, cpc_clk);
 
 cpc_pocket_input cpc_input (
     .clk       ( cpc_clk ),
     .reset_n   ( cpc_reset_n ),
     .cont1_key ( cont1_key_cpc ),
+    .cont3_key ( cont3_key_cpc ),
+    .cont3_joy ( cont3_joy_cpc ),
+    .cont3_trig( cont3_trig_cpc ),
     .ps2_key   ( cpc_ps2_key ),
     .joy1      ( cpc_joy1 ),
     .joy2      ( cpc_joy2 ),
