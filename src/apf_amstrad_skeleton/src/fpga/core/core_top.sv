@@ -274,6 +274,8 @@ wire [31:0] cont1_key_cpc;
 wire [10:0] cpc_ps2_key;
 wire [6:0]  cpc_joy1;
 wire [6:0]  cpc_joy2;
+wire        cpc_vkb_active;
+wire [5:0]  cpc_vkb_index;
 
 synch_3 host_reset_sync_cpc(host_reset_n, host_reset_n_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
@@ -284,7 +286,9 @@ cpc_pocket_input cpc_input (
     .cont1_key ( cont1_key_cpc ),
     .ps2_key   ( cpc_ps2_key ),
     .joy1      ( cpc_joy1 ),
-    .joy2      ( cpc_joy2 )
+    .joy2      ( cpc_joy2 ),
+    .vkb_active( cpc_vkb_active ),
+    .vkb_index ( cpc_vkb_index )
 );
 
 cpc_machine_pocket cpc_machine (
@@ -343,6 +347,7 @@ reg [23:0] cpc_native_rgb = 24'h000000;
 reg       cpc_hsync_prev = 1'b0;
 reg       cpc_vsync_prev = 1'b0;
 reg [2:0] cpc_hsync_delay = 3'd0;
+wire [23:0] cpc_overlay_rgb;
 
 always @(posedge cpc_clk) begin
     if (!cpc_reset_n) begin
@@ -441,7 +446,19 @@ always @(*) begin
     end
 end
 
-assign video_rgb          = cpc_rom_loaded ? cpc_native_rgb : (visible ? display_rgb : 24'h000000);
+cpc_virtual_keyboard_overlay cpc_vkb_overlay (
+    .clk            ( cpc_clk ),
+    .reset_n        ( cpc_reset_n ),
+    .ce             ( cpc_apf_ce ),
+    .de             ( cpc_native_de ),
+    .vs             ( cpc_native_vs ),
+    .rgb_in         ( cpc_native_rgb ),
+    .active         ( cpc_vkb_active & cpc_rom_loaded ),
+    .selected_index ( cpc_vkb_index ),
+    .rgb_out        ( cpc_overlay_rgb )
+);
+
+assign video_rgb          = cpc_rom_loaded ? (cpc_vkb_active ? cpc_overlay_rgb : cpc_native_rgb) : (visible ? display_rgb : 24'h000000);
 assign video_de           = cpc_rom_loaded ? cpc_native_de : visible;
 assign video_skip         = 1'b0;
 assign video_hs           = cpc_rom_loaded ? cpc_native_hs : ~h_sync;
