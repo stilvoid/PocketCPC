@@ -219,6 +219,8 @@ assign vpll_feed = 1'b0;
 wire cpc_clk;
 wire cpc_pll_locked;
 wire cpc_pll_locked_74;
+reg  cpc_pll_ready_74 = 1'b0;
+reg [15:0] cpc_pll_lock_count = 16'd0;
 wire cpc_reset_n;
 wire host_reset_n;
 
@@ -230,7 +232,24 @@ cpc_pll cpc_pll_inst (
 );
 
 synch_3 cpc_pll_lock_sync_74(cpc_pll_locked, cpc_pll_locked_74, clk_74a);
-synch_3 cpc_reset_sync(core_reset_n & cpc_pll_locked & host_reset_n, cpc_reset_n, cpc_clk);
+
+always @(posedge clk_74a) begin
+    if (!core_reset_n) begin
+        cpc_pll_ready_74   <= 1'b0;
+        cpc_pll_lock_count <= 16'd0;
+    end else if (!cpc_pll_ready_74) begin
+        if (cpc_pll_locked_74) begin
+            cpc_pll_lock_count <= cpc_pll_lock_count + 16'd1;
+            if (&cpc_pll_lock_count) begin
+                cpc_pll_ready_74 <= 1'b1;
+            end
+        end else begin
+            cpc_pll_lock_count <= 16'd0;
+        end
+    end
+end
+
+synch_3 cpc_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_n, cpc_reset_n, cpc_clk);
 
 // MiSTer runs the CPC from 64 MHz and derives a clean 16 MHz gate-array enable.
 reg [1:0]  cpc_div    = 2'd0;
@@ -591,8 +610,8 @@ core_bridge_cmd cmd (
     .bridge_wr                   ( bridge_wr ),
     .bridge_wr_data              ( bridge_wr_data ),
 
-    .status_boot_done            ( core_reset_n & cpc_pll_locked_74 ),
-    .status_setup_done           ( core_reset_n & cpc_pll_locked_74 ),
+    .status_boot_done            ( core_reset_n & cpc_pll_ready_74 ),
+    .status_setup_done           ( core_reset_n & cpc_pll_ready_74 ),
     .status_running              ( host_reset_n ),
 
     .dataslot_requestread        ( ),

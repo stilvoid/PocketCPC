@@ -92,7 +92,7 @@ function [9:0] map_vkb_index_to_ps2;
                     6'd26: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3B}; // J
                     6'd27: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h42}; // K
                     6'd28: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4B}; // L
-                    6'd29: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4C}; // :
+                    6'd29: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h52}; // ;
                     6'd30: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1A}; // Z
                     6'd31: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h22}; // X
                     6'd32: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h21}; // C
