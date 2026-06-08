@@ -5,6 +5,10 @@ This project should reuse as much as practical from two reference cores:
 - OpenFPGA ZX Spectrum for Analogue Pocket integration.
 - MiSTer Amstrad CPC for CPC hardware behavior.
 
+For dock-specific keyboard handling, also consult `markus-zzz/myc64-pocket`
+because it documents and implements the Pocket dock USB keyboard report layout
+used by the APF controller words.
+
 Do not treat either reference as loose inspiration when code can be copied,
 adapted, or kept structurally equivalent. New local HDL should usually be glue
 between those two worlds, not a fresh reimplementation of solved behavior.
@@ -19,9 +23,12 @@ For every subsystem change:
 2. Check whether the ZX Spectrum Pocket core already implements the equivalent
    Analogue Pocket/APF pattern. If it does, copy or closely adapt that platform
    pattern.
-3. Add new local code only when neither reference has the required boundary
+3. For dock keyboard input, check `markus-zzz/myc64-pocket` before inventing an
+   APF report interpretation. Its README and `src/bios/keyboard-ext.c` show the
+   known working `cont3_key`/`cont3_joy`/`cont3_trig` layout.
+4. Add new local code only when neither reference has the required boundary
    adapter, or when the references are incompatible and a small bridge is needed.
-4. Document any deliberate divergence from either reference in the relevant
+5. Document any deliberate divergence from either reference in the relevant
    source comment or docs file.
 
 ## Ownership Boundaries
@@ -43,6 +50,11 @@ The ZX Spectrum Pocket core owns the preferred shape for:
 - Asset/data-slot loading patterns such as `boot.rom`.
 - Controller, virtual keyboard, platform metadata, release layout, and build
   project organization.
+
+The MyC64 Pocket core owns the preferred shape for:
+
+- Dock USB keyboard APF report decoding: modifiers from `cont3_key[15:8]` and
+  six HID usage bytes from `cont3_joy` plus `cont3_trig`.
 
 Local PocketCPC code should own only:
 

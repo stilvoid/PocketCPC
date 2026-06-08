@@ -30,22 +30,25 @@ localparam [7:0] PS2_CTRL   = 8'h14;
 wire [15:0] buttons = cont1_key[15:0];
 wire [15:0] changed = buttons ^ buttons_prev;
 wire [15:0] pressed = buttons & ~buttons_prev;
-wire        dock_keyboard_active = cont3_key[31:28] == 4'h4;
-wire [15:0] dock_keyboard_mods = dock_keyboard_active ? (cont3_key[15:0] & 16'h0033) : 16'd0;
-wire [47:0] dock_keyboard_codes = dock_keyboard_active ? {
+wire [7:0] dock_keyboard_mods = cont3_key[15:8];
+wire [47:0] dock_keyboard_codes = {
     cont3_joy[31:24],
     cont3_joy[23:16],
     cont3_joy[15:8],
     cont3_joy[7:0],
     cont3_trig[15:8],
     cont3_trig[7:0]
-} : 48'd0;
+};
 
 reg [15:0] buttons_prev = 16'd0;
 reg [15:0] pending      = 16'd0;
 reg [8:0]  vkb_a_ps2    = {1'b0, 8'h16};
-reg [15:0] dock_keyboard_mods_active = 16'd0;
+reg [7:0]  dock_keyboard_mods_active = 8'd0;
 reg [47:0] dock_keyboard_codes_active = 48'd0;
+reg [7:0]  dock_keyboard_mods_sample = 8'd0;
+reg [47:0] dock_keyboard_codes_sample = 48'd0;
+reg [1:0]  dock_keyboard_phase = 2'd3;
+reg [2:0]  dock_keyboard_index = 3'd0;
 
 // Leave joystick lines idle for this first keyboard-focused input path. The
 // Pocket buttons below are presented as CPC keyboard keys instead.
@@ -188,34 +191,6 @@ function automatic dock_keyboard_code_present;
     end
 endfunction
 
-function automatic [47:0] dock_keyboard_add_code;
-    input [47:0] report;
-    input [7:0] code;
-    begin
-        dock_keyboard_add_code = report;
-        if (report[47:40] == 8'd0) dock_keyboard_add_code[47:40] = code;
-        else if (report[39:32] == 8'd0) dock_keyboard_add_code[39:32] = code;
-        else if (report[31:24] == 8'd0) dock_keyboard_add_code[31:24] = code;
-        else if (report[23:16] == 8'd0) dock_keyboard_add_code[23:16] = code;
-        else if (report[15:8] == 8'd0) dock_keyboard_add_code[15:8] = code;
-        else if (report[7:0] == 8'd0) dock_keyboard_add_code[7:0] = code;
-    end
-endfunction
-
-function automatic [47:0] dock_keyboard_remove_code;
-    input [47:0] report;
-    input [7:0] code;
-    begin
-        dock_keyboard_remove_code = report;
-        if (report[47:40] == code) dock_keyboard_remove_code[47:40] = 8'd0;
-        if (report[39:32] == code) dock_keyboard_remove_code[39:32] = 8'd0;
-        if (report[31:24] == code) dock_keyboard_remove_code[31:24] = 8'd0;
-        if (report[23:16] == code) dock_keyboard_remove_code[23:16] = 8'd0;
-        if (report[15:8] == code) dock_keyboard_remove_code[15:8] = 8'd0;
-        if (report[7:0] == code) dock_keyboard_remove_code[7:0] = 8'd0;
-    end
-endfunction
-
 function automatic [9:0] map_usb_hid_to_ps2;
     input [7:0] hid_code;
     begin
@@ -294,14 +269,14 @@ function automatic [9:0] map_usb_hid_to_ps2;
 endfunction
 
 function automatic [9:0] map_dock_modifier_to_ps2;
-    input [3:0] mod_index;
+    input [2:0] mod_index;
     begin
         map_dock_modifier_to_ps2 = 10'd0;
         case (mod_index)
-            4'd0: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};
-            4'd1: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT};
-            4'd4: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};
-            4'd5: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT};
+            3'd0: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};   // Left Ctrl
+            3'd1: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Left Shift
+            3'd4: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};   // Right Ctrl
+            3'd5: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Right Shift
             default: map_dock_modifier_to_ps2 = 10'd0;
         endcase
     end
@@ -352,16 +327,13 @@ reg [15:0] next_pending;
 reg [3:0]  selected_button;
 reg [9:0]  selected_ps2;
 reg        selected_valid;
-reg [9:0]  dock_selected_ps2;
-reg        dock_selected_valid;
-reg        dock_selected_pressed;
-reg        dock_selected_is_modifier;
-reg [3:0]  dock_selected_modifier;
-reg [7:0]  dock_selected_code;
 integer    scan_idx;
-integer    dock_scan_idx;
-reg [15:0] dock_modifier_delta;
-reg [7:0]  dock_scan_code;
+
+wire [7:0] dock_active_code = dock_keyboard_code_at(dock_keyboard_codes_active, dock_keyboard_index);
+wire [7:0] dock_report_code = dock_keyboard_code_at(dock_keyboard_codes_sample, dock_keyboard_index);
+wire [9:0] dock_modifier_ps2 = map_dock_modifier_to_ps2(dock_keyboard_index);
+wire [9:0] dock_active_ps2 = map_usb_hid_to_ps2(dock_active_code);
+wire [9:0] dock_report_ps2 = map_usb_hid_to_ps2(dock_report_code);
 
 always @(*) begin
     next_pending    = pending | changed;
@@ -402,57 +374,6 @@ always @(*) begin
     end
 end
 
-always @(*) begin
-    dock_selected_ps2         = 10'd0;
-    dock_selected_valid       = 1'b0;
-    dock_selected_pressed     = 1'b0;
-    dock_selected_is_modifier = 1'b0;
-    dock_selected_modifier    = 4'd0;
-    dock_selected_code        = 8'd0;
-    dock_modifier_delta       = dock_keyboard_mods ^ dock_keyboard_mods_active;
-    dock_scan_code            = 8'd0;
-
-    for (dock_scan_idx = 0; dock_scan_idx < 16; dock_scan_idx = dock_scan_idx + 1) begin
-        if (dock_modifier_delta[dock_scan_idx] && !dock_selected_valid) begin
-            dock_selected_ps2 = map_dock_modifier_to_ps2(dock_scan_idx[3:0]);
-            if (dock_selected_ps2[9]) begin
-                dock_selected_valid       = 1'b1;
-                dock_selected_pressed     = dock_keyboard_mods[dock_scan_idx];
-                dock_selected_is_modifier = 1'b1;
-                dock_selected_modifier    = dock_scan_idx[3:0];
-            end
-        end
-    end
-
-    for (dock_scan_idx = 0; dock_scan_idx < 6; dock_scan_idx = dock_scan_idx + 1) begin
-        dock_scan_code = dock_keyboard_code_at(dock_keyboard_codes_active, dock_scan_idx[2:0]);
-        if ((dock_scan_code != 8'd0) &&
-            !dock_keyboard_code_present(dock_scan_code, dock_keyboard_codes) &&
-            !dock_selected_valid) begin
-            dock_selected_ps2 = map_usb_hid_to_ps2(dock_scan_code);
-            if (dock_selected_ps2[9]) begin
-                dock_selected_valid   = 1'b1;
-                dock_selected_pressed = 1'b0;
-                dock_selected_code    = dock_scan_code;
-            end
-        end
-    end
-
-    for (dock_scan_idx = 0; dock_scan_idx < 6; dock_scan_idx = dock_scan_idx + 1) begin
-        dock_scan_code = dock_keyboard_code_at(dock_keyboard_codes, dock_scan_idx[2:0]);
-        if ((dock_scan_code != 8'd0) &&
-            !dock_keyboard_code_present(dock_scan_code, dock_keyboard_codes_active) &&
-            !dock_selected_valid) begin
-            dock_selected_ps2 = map_usb_hid_to_ps2(dock_scan_code);
-            if (dock_selected_ps2[9]) begin
-                dock_selected_valid   = 1'b1;
-                dock_selected_pressed = 1'b1;
-                dock_selected_code    = dock_scan_code;
-            end
-        end
-    end
-end
-
 always @(posedge clk) begin
     if (!reset_n) begin
         buttons_prev <= 16'd0;
@@ -463,8 +384,12 @@ always @(posedge clk) begin
         vkb_page     <= 2'd0;
         vkb_shift    <= 1'b0;
         vkb_a_ps2    <= {1'b0, 8'h16};
-        dock_keyboard_mods_active  <= 16'd0;
+        dock_keyboard_mods_active  <= 8'd0;
         dock_keyboard_codes_active <= 48'd0;
+        dock_keyboard_mods_sample  <= 8'd0;
+        dock_keyboard_codes_sample <= 48'd0;
+        dock_keyboard_phase <= 2'd3;
+        dock_keyboard_index <= 3'd0;
     end else begin
         buttons_prev <= buttons;
         pending      <= next_pending;
@@ -521,21 +446,66 @@ always @(posedge clk) begin
                 selected_ps2[8],
                 selected_ps2[7:0]
             };
-        end else if (dock_selected_valid) begin
-            ps2_key <= {
-                ~ps2_key[10],
-                dock_selected_pressed,
-                dock_selected_ps2[8],
-                dock_selected_ps2[7:0]
-            };
+        end else begin
+            case (dock_keyboard_phase)
+                2'd0: begin
+                    if ((dock_keyboard_mods_sample[dock_keyboard_index] != dock_keyboard_mods_active[dock_keyboard_index]) &&
+                        dock_modifier_ps2[9]) begin
+                        ps2_key <= {
+                            ~ps2_key[10],
+                            dock_keyboard_mods_sample[dock_keyboard_index],
+                            dock_modifier_ps2[8],
+                            dock_modifier_ps2[7:0]
+                        };
+                        dock_keyboard_mods_active[dock_keyboard_index] <= dock_keyboard_mods_sample[dock_keyboard_index];
+                    end
 
-            if (dock_selected_is_modifier) begin
-                dock_keyboard_mods_active[dock_selected_modifier] <= dock_selected_pressed;
-            end else if (dock_selected_pressed) begin
-                dock_keyboard_codes_active <= dock_keyboard_add_code(dock_keyboard_codes_active, dock_selected_code);
-            end else begin
-                dock_keyboard_codes_active <= dock_keyboard_remove_code(dock_keyboard_codes_active, dock_selected_code);
-            end
+                    if (dock_keyboard_index == 3'd7) begin
+                        dock_keyboard_index <= 3'd0;
+                        dock_keyboard_phase <= 2'd1;
+                    end else begin
+                        dock_keyboard_index <= dock_keyboard_index + 3'd1;
+                    end
+                end
+
+                2'd1: begin
+                    if ((dock_active_code != 8'd0) &&
+                        !dock_keyboard_code_present(dock_active_code, dock_keyboard_codes_sample) &&
+                        dock_active_ps2[9]) begin
+                        ps2_key <= {~ps2_key[10], 1'b0, dock_active_ps2[8], dock_active_ps2[7:0]};
+                    end
+
+                    if (dock_keyboard_index == 3'd5) begin
+                        dock_keyboard_index <= 3'd0;
+                        dock_keyboard_phase <= 2'd2;
+                    end else begin
+                        dock_keyboard_index <= dock_keyboard_index + 3'd1;
+                    end
+                end
+
+                default: begin
+                    if (dock_keyboard_phase == 2'd3) begin
+                        dock_keyboard_mods_sample  <= dock_keyboard_mods;
+                        dock_keyboard_codes_sample <= dock_keyboard_codes;
+                        dock_keyboard_index <= 3'd0;
+                        dock_keyboard_phase <= 2'd0;
+                    end else begin
+                        if ((dock_report_code != 8'd0) &&
+                            !dock_keyboard_code_present(dock_report_code, dock_keyboard_codes_active) &&
+                            dock_report_ps2[9]) begin
+                            ps2_key <= {~ps2_key[10], 1'b1, dock_report_ps2[8], dock_report_ps2[7:0]};
+                        end
+
+                        if (dock_keyboard_index == 3'd5) begin
+                            dock_keyboard_index <= 3'd0;
+                            dock_keyboard_phase <= 2'd3;
+                            dock_keyboard_codes_active <= dock_keyboard_codes_sample;
+                        end else begin
+                            dock_keyboard_index <= dock_keyboard_index + 3'd1;
+                        end
+                    end
+                end
+            endcase
         end
     end
 end
