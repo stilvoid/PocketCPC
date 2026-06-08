@@ -518,6 +518,9 @@ wire [31:0] target_dataslot_length;
 wire        target_dataslot_ack;
 wire        target_dataslot_done;
 wire [2:0]  target_dataslot_err;
+wire        target_dataslot_ack_s;
+wire        target_dataslot_done_s;
+wire [2:0]  target_dataslot_err_s;
 wire        loader_cmd_request_flag;
 wire        loader_cmd_write_strobe;
 wire [3:0]  bridge_target_state;
@@ -566,9 +569,9 @@ pocket_dataslot_loader #(
     .target_dataslot_length      ( target_dataslot_length ),
     .cmd_request_flag            ( loader_cmd_request_flag ),
     .cmd_write_strobe            ( loader_cmd_write_strobe ),
-    .target_dataslot_ack         ( target_dataslot_ack ),
-    .target_dataslot_done        ( target_dataslot_done ),
-    .target_dataslot_err         ( target_dataslot_err ),
+    .target_dataslot_ack         ( target_dataslot_ack_s ),
+    .target_dataslot_done        ( target_dataslot_done_s ),
+    .target_dataslot_err         ( target_dataslot_err_s ),
     .loader_wr                   ( cpc_loader_wr ),
     .loader_addr                 ( cpc_loader_addr ),
     .loader_data                 ( cpc_loader_data ),
@@ -637,11 +640,11 @@ core_bridge_cmd cmd (
     .target_dataslot_getfile_s   ( 1'b0 ),
     .target_dataslot_openfile_s  ( 1'b0 ),
     .target_dataslot_ack         ( target_dataslot_ack ),
-    .target_dataslot_ack_s       ( ),
+    .target_dataslot_ack_s       ( target_dataslot_ack_s ),
     .target_dataslot_done        ( target_dataslot_done ),
-    .target_dataslot_done_s      ( ),
+    .target_dataslot_done_s      ( target_dataslot_done_s ),
     .target_dataslot_err         ( target_dataslot_err ),
-    .target_dataslot_err_s       ( ),
+    .target_dataslot_err_s       ( target_dataslot_err_s ),
     .target_dataslot_id_s        ( target_dataslot_id ),
     .target_dataslot_slotoffset_s ( target_dataslot_slotoffset ),
     .target_dataslot_slotoffset_48_s ( 16'd0 ),
