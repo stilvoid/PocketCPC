@@ -49,18 +49,120 @@ wire       glyph_region = (local_x >= GLYPH_X) && (local_x < GLYPH_X + 6'd10) &&
 wire [2:0] glyph_col = glyph_x_off[3:1];
 wire [2:0] glyph_row = glyph_y_off[3:1];
 wire [7:0] glyph_char = key_index_to_char(key_idx, page, shift_active);
-wire [4:0] glyph_bits = glyph_row_bits(glyph_char, glyph_row);
-wire       glyph_on = glyph_region && glyph_bits[3'd4 - glyph_col];
+wire [10:0] glyph_addr = {glyph_char, glyph_row};
 wire [23:0] key_fill = (shift_active && shift_cell) ? 24'h604800 : 24'h202020;
 wire [23:0] key_border = (shift_active && shift_cell) ? 24'hffd000 : 24'h606060;
 
-reg        in_band_r = 1'b0;
-reg        glyph_on_r = 1'b0;
-reg        selected_r = 1'b0;
-reg        border_r = 1'b0;
-reg [23:0] key_fill_r = 24'h202020;
-reg [23:0] key_border_r = 24'h606060;
-reg [23:0] rgb_in_r = 24'h000000;
+reg [4:0] font_rom [0:2047];
+reg [4:0] font_bits_r = 5'b00000;
+
+reg        in_band_s1 = 1'b0;
+reg        selected_s1 = 1'b0;
+reg        border_s1 = 1'b0;
+reg        glyph_region_s1 = 1'b0;
+reg [2:0]  glyph_col_s1 = 3'd0;
+reg [23:0] key_fill_s1 = 24'h202020;
+reg [23:0] key_border_s1 = 24'h606060;
+reg [23:0] rgb_in_s1 = 24'h000000;
+
+reg        in_band_s2 = 1'b0;
+reg        glyph_on_s2 = 1'b0;
+reg        selected_s2 = 1'b0;
+reg        border_s2 = 1'b0;
+reg [23:0] key_fill_s2 = 24'h202020;
+reg [23:0] key_border_s2 = 24'h606060;
+reg [23:0] rgb_in_s2 = 24'h000000;
+
+task set_glyph;
+    input [7:0] ch;
+    input [4:0] r0;
+    input [4:0] r1;
+    input [4:0] r2;
+    input [4:0] r3;
+    input [4:0] r4;
+    input [4:0] r5;
+    input [4:0] r6;
+    begin
+        font_rom[{ch, 3'd0}] = r0;
+        font_rom[{ch, 3'd1}] = r1;
+        font_rom[{ch, 3'd2}] = r2;
+        font_rom[{ch, 3'd3}] = r3;
+        font_rom[{ch, 3'd4}] = r4;
+        font_rom[{ch, 3'd5}] = r5;
+        font_rom[{ch, 3'd6}] = r6;
+    end
+endtask
+
+integer font_i;
+initial begin
+    for (font_i = 0; font_i < 2048; font_i = font_i + 1) begin
+        font_rom[font_i] = 5'b00000;
+    end
+
+    set_glyph(8'h21, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00000, 5'b00100);
+    set_glyph(8'h22, 5'b01010, 5'b01010, 5'b01010, 5'b00000, 5'b00000, 5'b00000, 5'b00000);
+    set_glyph(8'h24, 5'b00100, 5'b01111, 5'b10100, 5'b01110, 5'b00101, 5'b11110, 5'b00100);
+    set_glyph(8'h25, 5'b11001, 5'b11010, 5'b00010, 5'b00100, 5'b01000, 5'b01011, 5'b10011);
+    set_glyph(8'h26, 5'b01100, 5'b10010, 5'b10100, 5'b01000, 5'b10101, 5'b10010, 5'b01101);
+    set_glyph(8'h27, 5'b00100, 5'b00100, 5'b01000, 5'b00000, 5'b00000, 5'b00000, 5'b00000);
+    set_glyph(8'h28, 5'b00010, 5'b00100, 5'b01000, 5'b01000, 5'b01000, 5'b00100, 5'b00010);
+    set_glyph(8'h29, 5'b01000, 5'b00100, 5'b00010, 5'b00010, 5'b00010, 5'b00100, 5'b01000);
+    set_glyph(8'h2A, 5'b00000, 5'b10101, 5'b01110, 5'b11111, 5'b01110, 5'b10101, 5'b00000);
+    set_glyph(8'h2B, 5'b00000, 5'b00100, 5'b00100, 5'b11111, 5'b00100, 5'b00100, 5'b00000);
+    set_glyph(8'h2C, 5'b00000, 5'b00000, 5'b00000, 5'b00000, 5'b00100, 5'b00100, 5'b01000);
+    set_glyph(8'h2D, 5'b00000, 5'b00000, 5'b00000, 5'b11111, 5'b00000, 5'b00000, 5'b00000);
+    set_glyph(8'h2E, 5'b00000, 5'b00000, 5'b00000, 5'b00000, 5'b00000, 5'b01100, 5'b01100);
+    set_glyph(8'h2F, 5'b00001, 5'b00010, 5'b00010, 5'b00100, 5'b01000, 5'b01000, 5'b10000);
+    set_glyph(8'h30, 5'b01110, 5'b10001, 5'b10011, 5'b10101, 5'b11001, 5'b10001, 5'b01110);
+    set_glyph(8'h31, 5'b00100, 5'b01100, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b01110);
+    set_glyph(8'h32, 5'b01110, 5'b10001, 5'b00001, 5'b00010, 5'b00100, 5'b01000, 5'b11111);
+    set_glyph(8'h33, 5'b11110, 5'b00001, 5'b00001, 5'b01110, 5'b00001, 5'b00001, 5'b11110);
+    set_glyph(8'h34, 5'b00010, 5'b00110, 5'b01010, 5'b10010, 5'b11111, 5'b00010, 5'b00010);
+    set_glyph(8'h35, 5'b11111, 5'b10000, 5'b10000, 5'b11110, 5'b00001, 5'b00001, 5'b11110);
+    set_glyph(8'h36, 5'b01110, 5'b10000, 5'b10000, 5'b11110, 5'b10001, 5'b10001, 5'b01110);
+    set_glyph(8'h37, 5'b11111, 5'b00001, 5'b00010, 5'b00100, 5'b01000, 5'b01000, 5'b01000);
+    set_glyph(8'h38, 5'b01110, 5'b10001, 5'b10001, 5'b01110, 5'b10001, 5'b10001, 5'b01110);
+    set_glyph(8'h39, 5'b01110, 5'b10001, 5'b10001, 5'b01111, 5'b00001, 5'b00001, 5'b01110);
+    set_glyph(8'h3A, 5'b00000, 5'b00100, 5'b00100, 5'b00000, 5'b00100, 5'b00100, 5'b00000);
+    set_glyph(8'h3B, 5'b00000, 5'b00100, 5'b00100, 5'b00000, 5'b00100, 5'b00100, 5'b01000);
+    set_glyph(8'h3C, 5'b00010, 5'b00100, 5'b01000, 5'b10000, 5'b01000, 5'b00100, 5'b00010);
+    set_glyph(8'h3E, 5'b01000, 5'b00100, 5'b00010, 5'b00001, 5'b00010, 5'b00100, 5'b01000);
+    set_glyph(8'h3F, 5'b01110, 5'b10001, 5'b00001, 5'b00010, 5'b00100, 5'b00000, 5'b00100);
+    set_glyph(8'h40, 5'b01110, 5'b10001, 5'b10111, 5'b10101, 5'b10111, 5'b10000, 5'b01110);
+    set_glyph(8'h41, 5'b01110, 5'b10001, 5'b10001, 5'b11111, 5'b10001, 5'b10001, 5'b10001);
+    set_glyph(8'h42, 5'b11110, 5'b10001, 5'b10001, 5'b11110, 5'b10001, 5'b10001, 5'b11110);
+    set_glyph(8'h43, 5'b01110, 5'b10001, 5'b10000, 5'b10000, 5'b10000, 5'b10001, 5'b01110);
+    set_glyph(8'h44, 5'b11110, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b11110);
+    set_glyph(8'h45, 5'b11111, 5'b10000, 5'b10000, 5'b11110, 5'b10000, 5'b10000, 5'b11111);
+    set_glyph(8'h46, 5'b11111, 5'b10000, 5'b10000, 5'b11110, 5'b10000, 5'b10000, 5'b10000);
+    set_glyph(8'h47, 5'b01110, 5'b10001, 5'b10000, 5'b10111, 5'b10001, 5'b10001, 5'b01110);
+    set_glyph(8'h48, 5'b10001, 5'b10001, 5'b10001, 5'b11111, 5'b10001, 5'b10001, 5'b10001);
+    set_glyph(8'h49, 5'b01110, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b01110);
+    set_glyph(8'h4A, 5'b00111, 5'b00010, 5'b00010, 5'b00010, 5'b10010, 5'b10010, 5'b01100);
+    set_glyph(8'h4B, 5'b10001, 5'b10010, 5'b10100, 5'b11000, 5'b10100, 5'b10010, 5'b10001);
+    set_glyph(8'h4C, 5'b10000, 5'b10000, 5'b10000, 5'b10000, 5'b10000, 5'b10000, 5'b11111);
+    set_glyph(8'h4D, 5'b10001, 5'b11011, 5'b10101, 5'b10101, 5'b10001, 5'b10001, 5'b10001);
+    set_glyph(8'h4E, 5'b10001, 5'b11001, 5'b10101, 5'b10011, 5'b10001, 5'b10001, 5'b10001);
+    set_glyph(8'h4F, 5'b01110, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b01110);
+    set_glyph(8'h50, 5'b11110, 5'b10001, 5'b10001, 5'b11110, 5'b10000, 5'b10000, 5'b10000);
+    set_glyph(8'h51, 5'b01110, 5'b10001, 5'b10001, 5'b10001, 5'b10101, 5'b10010, 5'b01101);
+    set_glyph(8'h52, 5'b11110, 5'b10001, 5'b10001, 5'b11110, 5'b10100, 5'b10010, 5'b10001);
+    set_glyph(8'h53, 5'b01111, 5'b10000, 5'b10000, 5'b01110, 5'b00001, 5'b00001, 5'b11110);
+    set_glyph(8'h54, 5'b11111, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00100);
+    set_glyph(8'h55, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b01110);
+    set_glyph(8'h56, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b10001, 5'b01010, 5'b00100);
+    set_glyph(8'h57, 5'b10001, 5'b10001, 5'b10001, 5'b10101, 5'b10101, 5'b10101, 5'b01010);
+    set_glyph(8'h58, 5'b10001, 5'b10001, 5'b01010, 5'b00100, 5'b01010, 5'b10001, 5'b10001);
+    set_glyph(8'h59, 5'b10001, 5'b10001, 5'b01010, 5'b00100, 5'b00100, 5'b00100, 5'b00100);
+    set_glyph(8'h5A, 5'b11111, 5'b00001, 5'b00010, 5'b00100, 5'b01000, 5'b10000, 5'b11111);
+    set_glyph(8'h5B, 5'b01110, 5'b01000, 5'b01000, 5'b01000, 5'b01000, 5'b01000, 5'b01110);
+    set_glyph(8'h5C, 5'b10000, 5'b01000, 5'b01000, 5'b00100, 5'b00010, 5'b00010, 5'b00001);
+    set_glyph(8'h5D, 5'b01110, 5'b00010, 5'b00010, 5'b00010, 5'b00010, 5'b00010, 5'b01110);
+    set_glyph(8'h5E, 5'b00100, 5'b01010, 5'b10001, 5'b00000, 5'b00000, 5'b00000, 5'b00000);
+    set_glyph(8'h5F, 5'b00000, 5'b00000, 5'b00000, 5'b00000, 5'b00000, 5'b00000, 5'b11111);
+    set_glyph(8'h7C, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00100, 5'b00100);
+    set_glyph(8'hA3, 5'b00110, 5'b01001, 5'b01000, 5'b11110, 5'b01000, 5'b10001, 5'b11110);
+end
 
 function [7:0] key_index_to_char;
     input [5:0] key_index;
@@ -244,19 +346,28 @@ endfunction
 
 always @(posedge clk) begin
     if (!reset_n) begin
-        x            <= 10'd0;
-        y            <= 9'd0;
-        de_prev      <= 1'b0;
-        vs_prev      <= 1'b0;
-        in_band_r    <= 1'b0;
-        glyph_on_r   <= 1'b0;
-        selected_r   <= 1'b0;
-        border_r     <= 1'b0;
-        key_fill_r   <= 24'h202020;
-        key_border_r <= 24'h606060;
-        rgb_in_r     <= 24'h000000;
-        rgb_out      <= 24'h000000;
-    end else if (ce) begin
+	        x            <= 10'd0;
+	        y            <= 9'd0;
+	        de_prev      <= 1'b0;
+	        vs_prev      <= 1'b0;
+	        font_bits_r  <= 5'b00000;
+	        in_band_s1   <= 1'b0;
+	        selected_s1  <= 1'b0;
+	        border_s1    <= 1'b0;
+	        glyph_region_s1 <= 1'b0;
+	        glyph_col_s1 <= 3'd0;
+	        key_fill_s1  <= 24'h202020;
+	        key_border_s1 <= 24'h606060;
+	        rgb_in_s1    <= 24'h000000;
+	        in_band_s2   <= 1'b0;
+	        glyph_on_s2  <= 1'b0;
+	        selected_s2  <= 1'b0;
+	        border_s2    <= 1'b0;
+	        key_fill_s2  <= 24'h202020;
+	        key_border_s2 <= 24'h606060;
+	        rgb_in_s2    <= 24'h000000;
+	        rgb_out      <= 24'h000000;
+	    end else if (ce) begin
         if (!vs_prev && vs) begin
             y <= 9'd0;
         end
@@ -268,23 +379,41 @@ always @(posedge clk) begin
             y <= y + 9'd1;
         end
 
-        de_prev <= de;
-        vs_prev <= vs;
+	        de_prev <= de;
+	        vs_prev <= vs;
 
-        in_band_r    <= in_band;
-        glyph_on_r   <= glyph_on;
-        selected_r   <= selected;
-        border_r     <= border;
-        key_fill_r   <= key_fill;
-        key_border_r <= key_border;
-        rgb_in_r     <= rgb_in;
+	        font_bits_r <= font_rom[glyph_addr];
 
-        if (in_band_r && glyph_on_r) rgb_out <= selected_r ? 24'h000000 : 24'hffffff;
-        else if (in_band_r && border_r) rgb_out <= selected_r ? 24'hffffff : key_border_r;
-        else if (in_band_r) rgb_out <= selected_r ? 24'hffd000 : key_fill_r;
-        else rgb_out <= rgb_in_r;
-    end
-end
+	        in_band_s1      <= in_band;
+	        selected_s1     <= selected;
+	        border_s1       <= border;
+	        glyph_region_s1 <= glyph_region;
+	        glyph_col_s1    <= glyph_col;
+	        key_fill_s1     <= key_fill;
+	        key_border_s1   <= key_border;
+	        rgb_in_s1       <= rgb_in;
+
+	        in_band_s2    <= in_band_s1;
+	        selected_s2   <= selected_s1;
+	        border_s2     <= border_s1;
+	        key_fill_s2   <= key_fill_s1;
+	        key_border_s2 <= key_border_s1;
+	        rgb_in_s2     <= rgb_in_s1;
+	        case (glyph_col_s1)
+	            3'd0: glyph_on_s2 <= glyph_region_s1 && font_bits_r[4];
+	            3'd1: glyph_on_s2 <= glyph_region_s1 && font_bits_r[3];
+	            3'd2: glyph_on_s2 <= glyph_region_s1 && font_bits_r[2];
+	            3'd3: glyph_on_s2 <= glyph_region_s1 && font_bits_r[1];
+	            3'd4: glyph_on_s2 <= glyph_region_s1 && font_bits_r[0];
+	            default: glyph_on_s2 <= 1'b0;
+	        endcase
+
+	        if (in_band_s2 && glyph_on_s2) rgb_out <= selected_s2 ? 24'h000000 : 24'hffffff;
+	        else if (in_band_s2 && border_s2) rgb_out <= selected_s2 ? 24'hffffff : key_border_s2;
+	        else if (in_band_s2) rgb_out <= selected_s2 ? 24'hffd000 : key_fill_s2;
+	        else rgb_out <= rgb_in_s2;
+	    end
+	end
 
 endmodule
 

@@ -50,6 +50,11 @@ The ZX Spectrum Pocket core owns the preferred shape for:
 - Asset/data-slot loading patterns such as `boot.rom`.
 - Controller, virtual keyboard, platform metadata, release layout, and build
   project organization.
+- Host-facing OSD and virtual-keyboard presentation. Prefer ZX's approach of
+  rendering menu/keyboard graphics into an OSD bitmap RAM and keeping the live
+  FPGA video compositor simple. Avoid adding wide per-pixel glyph or layout
+  decode directly into the CPC video path unless it is only a temporary
+  stepping stone.
 
 The MyC64 Pocket core owns the preferred shape for:
 
@@ -76,6 +81,26 @@ reason to diverge:
 - If colour or phase issues appear on hardware, first compare against MiSTer
   `Amstrad.sv` plus `sys/video_mixer.sv`, and against ZX `core_top.sv`, before
   adding custom phase or palette logic.
+- Treat the Pocket scaler/video pins as hardware-sensitive even when Quartus
+  reports a clean compile. Current builds still warn that `cpc_apf_pixel_clk`
+  and `cpc_apf_pixel_clk_90` are detected clocks without explicit clock
+  assignments, so manual Pocket screenshots remain the final check for video
+  changes until those constraints are tightened.
+
+## Virtual Keyboard Rule
+
+Virtual keyboard work should follow the ZX Spectrum Pocket core before local
+innovation:
+
+- Use ZX `src/firmware/main.c` and `src/firmware/main.h` as the reference for
+  keyboard layout/state rendering.
+- Use ZX `src/fpga/core/osdram.v` and the OSD RAM hookup in
+  `src/fpga/core/core_top.sv` as the reference for overlay storage and
+  compositing.
+- Keep CPC key matrix behavior mapped from MiSTer CPC/PPI expectations, but
+  keep the Pocket presentation/control-plane pattern structurally close to ZX.
+- If an HDL-only overlay remains in use temporarily, keep it pipelined and
+  ROM/RAM-backed. Do not grow a single-cycle combinational glyph renderer.
 
 ## Review Checklist
 
