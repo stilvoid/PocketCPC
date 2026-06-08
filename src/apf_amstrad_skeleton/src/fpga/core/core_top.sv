@@ -220,6 +220,7 @@ wire cpc_clk;
 wire cpc_pll_locked;
 wire cpc_pll_locked_74;
 wire cpc_reset_n;
+wire host_reset_n;
 
 cpc_pll cpc_pll_inst (
     .refclk   ( clk_74a ),
@@ -229,7 +230,7 @@ cpc_pll cpc_pll_inst (
 );
 
 synch_3 cpc_pll_lock_sync_74(cpc_pll_locked, cpc_pll_locked_74, clk_74a);
-synch_3 cpc_reset_sync(core_reset_n & cpc_pll_locked, cpc_reset_n, cpc_clk);
+synch_3 cpc_reset_sync(core_reset_n & cpc_pll_locked & host_reset_n, cpc_reset_n, cpc_clk);
 
 // MiSTer runs the CPC from 64 MHz and derives a clean 16 MHz gate-array enable.
 reg [1:0]  cpc_div    = 2'd0;
@@ -268,7 +269,6 @@ wire        cpc_loader_error;
 wire [3:0]  cpc_loader_state;
 wire [31:0] cpc_loader_offset;
 wire        cpc_rom_loaded;
-wire        host_reset_n;
 wire        host_reset_n_cpc;
 wire [31:0] cont1_key_cpc;
 wire [31:0] cont3_key_cpc;

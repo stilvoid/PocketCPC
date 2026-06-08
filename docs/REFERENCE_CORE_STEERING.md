@@ -45,6 +45,10 @@ The ZX Spectrum Pocket core owns the preferred shape for:
 
 - APF top-level pin wiring and safe unused-interface handling.
 - `core_top` port shape and bridge command integration.
+- Framework Reset Enter/Exit handling. Treat the bridge command module's
+  `reset_n` as a core-wide runtime reset for Pocket-facing state, and synchronize
+  it into derived clock domains before using it to release machine, loader,
+  input, or video state.
 - Scaler/DDIO video output structure, including registered RGB/DE/HS/VS output
   patterns.
 - Asset/data-slot loading patterns such as `boot.rom`.
