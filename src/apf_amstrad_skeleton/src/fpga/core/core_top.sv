@@ -223,6 +223,9 @@ reg  cpc_pll_ready_74 = 1'b0;
 reg [15:0] cpc_pll_lock_count = 16'd0;
 wire cpc_reset_n;
 wire host_reset_n;
+reg  host_reset_stable_n = 1'b0;
+reg [15:0] host_reset_high_count = 16'd0;
+reg [15:0] host_reset_low_count  = 16'd0;
 
 cpc_pll cpc_pll_inst (
     .refclk   ( clk_74a ),
@@ -249,7 +252,31 @@ always @(posedge clk_74a) begin
     end
 end
 
-synch_3 cpc_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_n, cpc_reset_n, cpc_clk);
+always @(posedge clk_74a) begin
+    if (!core_reset_n) begin
+        host_reset_stable_n  <= 1'b0;
+        host_reset_high_count <= 16'd0;
+        host_reset_low_count  <= 16'd0;
+    end else if (host_reset_n) begin
+        host_reset_low_count <= 16'd0;
+        if (!host_reset_stable_n) begin
+            host_reset_high_count <= host_reset_high_count + 16'd1;
+            if (&host_reset_high_count) begin
+                host_reset_stable_n <= 1'b1;
+            end
+        end
+    end else begin
+        host_reset_high_count <= 16'd0;
+        if (host_reset_stable_n) begin
+            host_reset_low_count <= host_reset_low_count + 16'd1;
+            if (&host_reset_low_count) begin
+                host_reset_stable_n <= 1'b0;
+            end
+        end
+    end
+end
+
+synch_3 cpc_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_stable_n, cpc_reset_n, cpc_clk);
 
 // MiSTer runs the CPC from 64 MHz and derives a clean 16 MHz gate-array enable.
 reg [1:0]  cpc_div    = 2'd0;
@@ -301,7 +328,7 @@ wire [5:0]  cpc_vkb_index;
 wire [1:0]  cpc_vkb_page;
 wire        cpc_vkb_shift;
 
-synch_3 host_reset_sync_cpc(host_reset_n, host_reset_n_cpc, cpc_clk);
+synch_3 host_reset_sync_cpc(host_reset_stable_n, host_reset_n_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_key_sync_cpc(cont3_key, cont3_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_joy_sync_cpc(cont3_joy, cont3_joy_cpc, cpc_clk);
@@ -468,7 +495,7 @@ always @(*) begin
             display_rgb = 24'hff0000;
         end else if (cpc_loader_done) begin
             display_rgb = 24'h000000;
-        end else if (host_reset_n) begin
+        end else if (host_reset_stable_n) begin
             display_rgb = 24'h000000;
         end else begin
             display_rgb = 24'h000000;
@@ -612,7 +639,7 @@ core_bridge_cmd cmd (
 
     .status_boot_done            ( core_reset_n & cpc_pll_ready_74 ),
     .status_setup_done           ( core_reset_n & cpc_pll_ready_74 ),
-    .status_running              ( host_reset_n ),
+    .status_running              ( host_reset_stable_n ),
 
     .dataslot_requestread        ( ),
     .dataslot_requestread_id     ( ),
