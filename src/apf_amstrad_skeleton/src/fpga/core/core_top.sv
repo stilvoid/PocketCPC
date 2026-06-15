@@ -222,6 +222,7 @@ wire cpc_pll_locked_74;
 reg  cpc_pll_ready_74 = 1'b0;
 reg [15:0] cpc_pll_lock_count = 16'd0;
 wire cpc_reset_n;
+wire cpc_loader_reset_n;
 wire host_reset_n;
 reg  host_reset_stable_n = 1'b0;
 reg [15:0] host_reset_high_count = 16'd0;
@@ -277,6 +278,7 @@ always @(posedge clk_74a) begin
 end
 
 synch_3 cpc_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_stable_n, cpc_reset_n, cpc_clk);
+synch_3 cpc_loader_reset_sync(core_reset_n & cpc_pll_ready_74, cpc_loader_reset_n, cpc_clk);
 
 // MiSTer runs the CPC from 64 MHz and derives a clean 16 MHz gate-array enable.
 reg [1:0]  cpc_div    = 2'd0;
@@ -315,6 +317,18 @@ wire        cpc_loader_error;
 wire [3:0]  cpc_loader_state;
 wire [31:0] cpc_loader_offset;
 wire        cpc_rom_loaded;
+wire [31:0] cpc_sd_lba;
+wire [1:0]  cpc_sd_rd;
+wire [1:0]  cpc_sd_wr;
+wire        cpc_sd_ack;
+wire [8:0]  cpc_sd_buff_addr;
+wire [7:0]  cpc_sd_buff_dout;
+wire [7:0]  cpc_sd_buff_din;
+wire        cpc_sd_buff_wr;
+wire [1:0]  cpc_img_mounted;
+wire [31:0] cpc_img_size;
+wire        cpc_img_wp;
+wire [1:0]  cpc_drive_ready;
 wire        host_reset_n_cpc;
 wire [31:0] cont1_key_cpc;
 wire [31:0] cont3_key_cpc;
@@ -353,6 +367,7 @@ cpc_pocket_input cpc_input (
 cpc_machine_pocket cpc_machine (
     .clk             ( cpc_clk ),
     .reset           ( !cpc_reset_n | cont1_key_cpc[15] ),
+    .rom_reset       ( !cpc_loader_reset_n ),
     .ce_16           ( cpc_ce_16 ),
     .ce_pix          ( cpc_ce_16 ),
     .joy1            ( cpc_joy1 ),
@@ -364,6 +379,18 @@ cpc_machine_pocket cpc_machine (
     .loader_done     ( cpc_loader_done ),
     .loader_error    ( cpc_loader_error ),
     .rom_loaded      ( cpc_rom_loaded ),
+    .sd_lba          ( cpc_sd_lba ),
+    .sd_rd           ( cpc_sd_rd ),
+    .sd_wr           ( cpc_sd_wr ),
+    .sd_ack          ( cpc_sd_ack ),
+    .sd_buff_addr    ( cpc_sd_buff_addr ),
+    .sd_buff_dout    ( cpc_sd_buff_dout ),
+    .sd_buff_din     ( cpc_sd_buff_din ),
+    .sd_buff_wr      ( cpc_sd_buff_wr ),
+    .img_mounted     ( cpc_img_mounted ),
+    .img_size        ( cpc_img_size ),
+    .img_wp          ( cpc_img_wp ),
+    .fdc_ready       ( cpc_drive_ready ),
     .rgb             ( cpc_rgb ),
     .hsync           ( cpc_hsync ),
     .vsync           ( cpc_vsync ),
@@ -556,6 +583,16 @@ wire        savestate_start;
 wire        savestate_load;
 wire [9:0]  datatable_addr;
 wire [31:0] datatable_q;
+wire        rom_target_dataslot_read;
+wire [15:0] rom_target_dataslot_id;
+wire [31:0] rom_target_dataslot_slotoffset;
+wire [31:0] rom_target_dataslot_bridgeaddr;
+wire [31:0] rom_target_dataslot_length;
+wire        fdc_target_dataslot_read;
+wire [15:0] fdc_target_dataslot_id;
+wire [31:0] fdc_target_dataslot_slotoffset;
+wire [31:0] fdc_target_dataslot_bridgeaddr;
+wire [31:0] fdc_target_dataslot_length;
 wire        target_dataslot_read;
 wire [15:0] target_dataslot_id;
 wire [31:0] target_dataslot_slotoffset;
@@ -569,9 +606,60 @@ wire        target_dataslot_done_s;
 wire [2:0]  target_dataslot_err_s;
 wire        loader_cmd_request_flag;
 wire        loader_cmd_write_strobe;
+wire        fdc_cmd_request_flag;
+wire        fdc_cmd_write_strobe;
+wire        bridge_cmd_ack_flag;
+wire        fdc_target_active;
+wire        dataslot_update;
+wire [15:0] dataslot_update_id;
+wire [31:0] dataslot_update_size;
+wire        dataslot_update_s;
+wire [15:0] dataslot_update_id_s;
+wire [31:0] dataslot_update_size_s;
 wire [3:0]  bridge_target_state;
 wire [15:0] bridge_target_status;
 wire [3:0]  bridge_target_io;
+wire        dataslot_runtime_enable = cpc_loader_done & cpc_rom_loaded;
+wire        fdc_client_selected = dataslot_runtime_enable & fdc_target_active;
+
+reg         fdc_dataslot_toggle_74 = 1'b0;
+reg  [15:0] fdc_dataslot_id_74 = 16'd0;
+reg  [31:0] fdc_dataslot_size_74 = 32'd0;
+wire        fdc_dataslot_toggle_cpc;
+wire [15:0] fdc_dataslot_id_cpc;
+wire [31:0] fdc_dataslot_size_cpc;
+reg         fdc_dataslot_toggle_cpc_d = 1'b0;
+wire        fdc_dataslot_update_cpc = fdc_dataslot_toggle_cpc ^ fdc_dataslot_toggle_cpc_d;
+
+assign target_dataslot_read       = fdc_client_selected ? fdc_target_dataslot_read       : rom_target_dataslot_read;
+assign target_dataslot_id         = fdc_client_selected ? fdc_target_dataslot_id         : rom_target_dataslot_id;
+assign target_dataslot_slotoffset = fdc_client_selected ? fdc_target_dataslot_slotoffset : rom_target_dataslot_slotoffset;
+assign target_dataslot_bridgeaddr = fdc_client_selected ? fdc_target_dataslot_bridgeaddr : rom_target_dataslot_bridgeaddr;
+assign target_dataslot_length     = fdc_client_selected ? fdc_target_dataslot_length     : rom_target_dataslot_length;
+
+always @(posedge clk_74a) begin
+    if (!core_reset_n) begin
+        fdc_dataslot_toggle_74 <= 1'b0;
+        fdc_dataslot_id_74     <= 16'd0;
+        fdc_dataslot_size_74   <= 32'd0;
+    end else if (dataslot_update) begin
+        fdc_dataslot_toggle_74 <= ~fdc_dataslot_toggle_74;
+        fdc_dataslot_id_74     <= dataslot_update_id;
+        fdc_dataslot_size_74   <= dataslot_update_size;
+    end
+end
+
+synch_3 fdc_dataslot_toggle_sync(fdc_dataslot_toggle_74, fdc_dataslot_toggle_cpc, cpc_clk);
+synch_3 #(.WIDTH(16)) fdc_dataslot_id_sync(fdc_dataslot_id_74, fdc_dataslot_id_cpc, cpc_clk);
+synch_3 #(.WIDTH(32)) fdc_dataslot_size_sync(fdc_dataslot_size_74, fdc_dataslot_size_cpc, cpc_clk);
+
+always @(posedge cpc_clk) begin
+    if (!cpc_loader_reset_n) begin
+        fdc_dataslot_toggle_cpc_d <= 1'b0;
+    end else begin
+        fdc_dataslot_toggle_cpc_d <= fdc_dataslot_toggle_cpc;
+    end
+end
 
 assign bridge_rd_data = (bridge_addr[31:24] == 8'hf8) ? cmd_bridge_rd_data : regs_bridge_rd_data;
 
@@ -601,23 +689,23 @@ pocket_dataslot_loader #(
 ) rom_loader (
     .clk                         ( cpc_clk ),
     .bridge_clk                  ( clk_74a ),
-    .reset_n                     ( cpc_reset_n ),
+    .reset_n                     ( cpc_loader_reset_n ),
     .start                       ( host_reset_n_cpc ),
     .bridge_addr                 ( bridge_addr ),
     .bridge_wr                   ( bridge_wr ),
     .bridge_wr_data              ( bridge_wr_data ),
     .datatable_addr              ( datatable_addr ),
     .datatable_q                 ( datatable_q ),
-    .target_dataslot_read        ( target_dataslot_read ),
-    .target_dataslot_id          ( target_dataslot_id ),
-    .target_dataslot_slotoffset  ( target_dataslot_slotoffset ),
-    .target_dataslot_bridgeaddr  ( target_dataslot_bridgeaddr ),
-    .target_dataslot_length      ( target_dataslot_length ),
+    .target_dataslot_read        ( rom_target_dataslot_read ),
+    .target_dataslot_id          ( rom_target_dataslot_id ),
+    .target_dataslot_slotoffset  ( rom_target_dataslot_slotoffset ),
+    .target_dataslot_bridgeaddr  ( rom_target_dataslot_bridgeaddr ),
+    .target_dataslot_length      ( rom_target_dataslot_length ),
     .cmd_request_flag            ( loader_cmd_request_flag ),
     .cmd_write_strobe            ( loader_cmd_write_strobe ),
-    .target_dataslot_ack         ( target_dataslot_ack_s ),
-    .target_dataslot_done        ( target_dataslot_done_s ),
-    .target_dataslot_err         ( target_dataslot_err_s ),
+    .target_dataslot_ack         ( fdc_client_selected ? 1'b0 : target_dataslot_ack_s ),
+    .target_dataslot_done        ( fdc_client_selected ? 1'b0 : target_dataslot_done_s ),
+    .target_dataslot_err         ( fdc_client_selected ? 3'd0 : target_dataslot_err_s ),
     .loader_wr                   ( cpc_loader_wr ),
     .loader_addr                 ( cpc_loader_addr ),
     .loader_data                 ( cpc_loader_data ),
@@ -625,6 +713,43 @@ pocket_dataslot_loader #(
     .loader_error                ( cpc_loader_error ),
     .debug_state                 ( cpc_loader_state ),
     .debug_offset                ( cpc_loader_offset )
+);
+
+pocket_fdc_dataslot fdc_loader (
+    .clk                         ( cpc_clk ),
+    .bridge_clk                  ( clk_74a ),
+    .reset_n                     ( cpc_loader_reset_n ),
+    .enable                      ( dataslot_runtime_enable ),
+    .bridge_addr                 ( bridge_addr ),
+    .bridge_wr                   ( bridge_wr ),
+    .bridge_wr_data              ( bridge_wr_data ),
+    .dataslot_update             ( fdc_dataslot_update_cpc ),
+    .dataslot_update_id          ( fdc_dataslot_id_cpc ),
+    .dataslot_update_size        ( fdc_dataslot_size_cpc ),
+    .sd_lba                      ( cpc_sd_lba ),
+    .sd_rd                       ( cpc_sd_rd ),
+    .sd_wr                       ( cpc_sd_wr ),
+    .sd_ack                      ( cpc_sd_ack ),
+    .sd_buff_addr                ( cpc_sd_buff_addr ),
+    .sd_buff_dout                ( cpc_sd_buff_dout ),
+    .sd_buff_din                 ( cpc_sd_buff_din ),
+    .sd_buff_wr                  ( cpc_sd_buff_wr ),
+    .img_mounted                 ( cpc_img_mounted ),
+    .img_size                    ( cpc_img_size ),
+    .img_wp                      ( cpc_img_wp ),
+    .ready                       ( cpc_drive_ready ),
+    .target_dataslot_read        ( fdc_target_dataslot_read ),
+    .target_dataslot_id          ( fdc_target_dataslot_id ),
+    .target_dataslot_slotoffset  ( fdc_target_dataslot_slotoffset ),
+    .target_dataslot_bridgeaddr  ( fdc_target_dataslot_bridgeaddr ),
+    .target_dataslot_length      ( fdc_target_dataslot_length ),
+    .cmd_request_flag            ( fdc_cmd_request_flag ),
+    .cmd_write_strobe            ( fdc_cmd_write_strobe ),
+    .cmd_ack_flag                ( fdc_client_selected ? bridge_cmd_ack_flag : 1'b0 ),
+    .target_dataslot_ack         ( fdc_client_selected ? target_dataslot_ack_s : 1'b0 ),
+    .target_dataslot_done        ( fdc_client_selected ? target_dataslot_done_s : 1'b0 ),
+    .target_dataslot_err         ( fdc_client_selected ? target_dataslot_err_s : 3'd0 ),
+    .target_active               ( fdc_target_active )
 );
 
 core_bridge_cmd cmd (
@@ -650,12 +775,12 @@ core_bridge_cmd cmd (
     .dataslot_requestwrite_size  ( ),
     .dataslot_requestwrite_ack   ( 1'b1 ),
     .dataslot_requestwrite_ok    ( 1'b1 ),
-    .dataslot_update             ( ),
-    .dataslot_update_id          ( ),
-    .dataslot_update_size        ( ),
-    .dataslot_update_s           ( ),
-    .dataslot_update_id_s        ( ),
-    .dataslot_update_size_s      ( ),
+    .dataslot_update             ( dataslot_update ),
+    .dataslot_update_id          ( dataslot_update_id ),
+    .dataslot_update_size        ( dataslot_update_size ),
+    .dataslot_update_s           ( dataslot_update_s ),
+    .dataslot_update_id_s        ( dataslot_update_id_s ),
+    .dataslot_update_size_s      ( dataslot_update_size_s ),
     .dataslot_allcomplete        ( ),
 
     .rtc_epoch_seconds           ( ),
@@ -705,9 +830,9 @@ core_bridge_cmd cmd (
     .datatable_q                 ( datatable_q ),
 
     .i_clk_sync                  ( cpc_clk ),
-    .i_write_strobe              ( loader_cmd_write_strobe ),
-    .i_request_flag              ( loader_cmd_request_flag ),
-	    .o_ack_flag                  ( ),
+    .i_write_strobe              ( fdc_client_selected ? fdc_cmd_write_strobe : loader_cmd_write_strobe ),
+    .i_request_flag              ( fdc_client_selected ? fdc_cmd_request_flag : loader_cmd_request_flag ),
+	    .o_ack_flag                  ( bridge_cmd_ack_flag ),
 	    .debug_tstate                ( bridge_target_state ),
 	    .debug_target_status         ( bridge_target_status ),
 	    .debug_target_io             ( bridge_target_io )

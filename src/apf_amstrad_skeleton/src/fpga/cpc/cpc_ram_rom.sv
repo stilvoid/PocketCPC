@@ -138,8 +138,7 @@ always @(posedge clk) begin
     end else if (loader_done && !loader_error) begin
         rom_loaded <= 1'b1;
         rom_map[ROM_SELECT_BASIC]  <= 1'b1;
-        // Keep AMSDOS hidden until the MiSTer FDC/u765 path is wired in.
-        rom_map[ROM_SELECT_AMSDOS] <= 1'b0;
+        rom_map[ROM_SELECT_AMSDOS] <= 1'b1;
     end
 end
 

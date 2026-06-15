@@ -59,6 +59,7 @@ set_global_assignment -name VERILOG_FILE cpc/Amstrad_MMU.v
 set_global_assignment -name VERILOG_FILE cpc/UM6845R.v
 set_global_assignment -name VERILOG_FILE cpc/i8255.v
 set_global_assignment -name SYSTEMVERILOG_FILE cpc/YM2149.sv
+set_global_assignment -name SYSTEMVERILOG_FILE cpc/u765/u765.sv
 set_global_assignment -name VERILOG_FILE cpc/crt_filter.v
 set_global_assignment -name SYSTEMVERILOG_FILE cpc/hid.sv
 set_global_assignment -name VERILOG_FILE core/dpram.v
@@ -68,6 +69,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE core/cpc_pocket_input.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/cpc_virtual_keyboard_overlay.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/core_top.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_dataslot_loader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_fdc_dataslot.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_bridge_regs.sv
 set_global_assignment -name VERILOG_FILE core/core_bridge_cmd.v
 

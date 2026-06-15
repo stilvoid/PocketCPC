@@ -31,6 +31,27 @@ For every subsystem change:
 5. Document any deliberate divergence from either reference in the relevant
    source comment or docs file.
 
+## Build/Test Discipline
+
+Avoid rebuilding, reinstalling, or manually retesting artefacts whose hardware
+behavior is already known. When a proposed step only rolls back to, or
+recreates, a build the user has already tested, do not spend a Quartus cycle or
+ask for another Pocket test unless the goal is explicitly to recover the Pocket
+to that known state for comparison or recovery. Iterate the design first, then
+build only when the generated artefact should provide new information on
+hardware.
+
+Before starting a long build, state what will be learned from that artefact. If
+the answer is "it should behave like the previous build", skip the build and
+continue analysis or implementation instead.
+
+Use git history to mark confirmed hardware progress, not speculative source
+states. Do not commit a hardware-facing change until the resulting build has
+been tested on the Pocket and the user has confirmed that behavior improved or
+at least moved in the right direction. If the result is unverified, unstable,
+or worse than the previous confirmed build, keep iterating in the working tree
+and do not commit.
+
 ## Ownership Boundaries
 
 The MiSTer Amstrad CPC core owns:

@@ -12,6 +12,7 @@
 module cpc_machine_pocket (
     input  wire        clk,
     input  wire        reset,
+    input  wire        rom_reset,
     input  wire        ce_16,
     input  wire        ce_pix,
 
@@ -25,6 +26,18 @@ module cpc_machine_pocket (
     input  wire        loader_done,
     input  wire        loader_error,
     output wire        rom_loaded,
+    output wire [31:0] sd_lba,
+    output wire [1:0]  sd_rd,
+    output wire [1:0]  sd_wr,
+    input  wire        sd_ack,
+    input  wire [8:0]  sd_buff_addr,
+    input  wire [7:0]  sd_buff_dout,
+    output wire [7:0]  sd_buff_din,
+    input  wire        sd_buff_wr,
+    input  wire [1:0]  img_mounted,
+    input  wire [31:0] img_size,
+    input  wire        img_wp,
+    input  wire [1:0]  fdc_ready,
 
     output wire [23:0] rgb,
     output wire        hsync,
@@ -67,6 +80,7 @@ wire        phi_en_n;
 wire        phi_en_p;
 wire [15:0] cpu_addr;
 wire [7:0]  cpu_dout;
+wire [7:0]  memory_cpu_din;
 wire        iorq;
 wire        mreq;
 wire        rd;
@@ -77,6 +91,17 @@ wire        cursor;
 wire [7:0]  rgb_r;
 wire [7:0]  rgb_g;
 wire [7:0]  rgb_b;
+wire        io_rd = iorq & rd;
+wire        io_wr = iorq & wr;
+wire [3:0]  fdc_sel = {cpu_addr[10], cpu_addr[8], cpu_addr[7], cpu_addr[0]};
+wire        u765_sel = (fdc_sel[3:1] == 3'b010);
+wire [7:0]  u765_dout;
+wire        fdc_bus_enable = rom_loaded;
+wire [7:0]  cpu_din = memory_cpu_din & ((fdc_bus_enable && u765_sel && io_rd) ? u765_dout : 8'hff);
+reg         motor = 1'b0;
+reg         old_io_wr = 1'b0;
+reg  [2:0]  u765_div = 3'd0;
+reg         ce_u765 = 1'b0;
 
 // CPC6128 OS reads PPI port B bits 1..3 as active-low distributor jumpers.
 // On this wrapper, 4'b1111 selects the bundled ROM's "Amstrad" string.
@@ -91,19 +116,18 @@ assign video_phase_n  = phi_en_n;
 assign video_phase_p  = phi_en_p;
 assign video_mode     = mode;
 
-wire [7:0]  cpu_din;
 wire [15:0] vram_din;
 wire [255:0] rom_map;
 
 cpc_ram_rom memory (
     .clk          ( clk ),
-    .reset        ( reset ),
+    .reset        ( rom_reset ),
     .mem_addr     ( mem_addr ),
     .mem_rd       ( mem_rd ),
     .mem_wr       ( mem_wr ),
     .cpu_io_rd    ( iorq & rd ),
     .cpu_dout     ( cpu_dout ),
-    .cpu_din      ( cpu_din ),
+    .cpu_din      ( memory_cpu_din ),
     .vram_addr    ( vram_addr ),
     .vram_din     ( vram_din ),
     .loader_wr    ( loader_wr ),
@@ -195,6 +219,49 @@ Amstrad_motherboard motherboard (
     .irq(1'b0),
     .nmi(1'b0),
     .cursor(cursor)
+);
+
+always @(posedge clk) begin
+    if (reset) begin
+        old_io_wr <= 1'b0;
+        motor     <= 1'b0;
+        u765_div  <= 3'd0;
+        ce_u765   <= 1'b0;
+    end else begin
+        old_io_wr <= io_wr;
+        if (!old_io_wr && io_wr && !fdc_sel[3:1]) begin
+            motor <= cpu_dout[0];
+        end
+
+        u765_div <= u765_div + 3'd1;
+        ce_u765  <= !u765_div[2:0];
+    end
+end
+
+u765 u765_drive (
+    .clk_sys     ( clk ),
+    .ce          ( ce_u765 ),
+    .reset       ( machine_reset ),
+    .ready       ( fdc_bus_enable ? fdc_ready : 2'b00 ),
+    .motor       ( {motor, motor} ),
+    .available   ( 2'b11 ),
+    .fast        ( 1'b0 ),
+    .a0          ( fdc_sel[0] ),
+    .nRD         ( ~(fdc_bus_enable & u765_sel & io_rd) ),
+    .nWR         ( ~(fdc_bus_enable & u765_sel & io_wr) ),
+    .din         ( cpu_dout ),
+    .dout        ( u765_dout ),
+    .img_mounted ( fdc_bus_enable ? img_mounted : 2'b00 ),
+    .img_wp      ( img_wp ),
+    .img_size    ( fdc_bus_enable ? img_size : 32'd0 ),
+    .sd_lba      ( sd_lba ),
+    .sd_rd       ( sd_rd ),
+    .sd_wr       ( sd_wr ),
+    .sd_ack      ( sd_ack ),
+    .sd_buff_addr( sd_buff_addr ),
+    .sd_buff_dout( sd_buff_dout ),
+    .sd_buff_din ( sd_buff_din ),
+    .sd_buff_wr  ( sd_buff_wr )
 );
 
 color_mix color_mix (

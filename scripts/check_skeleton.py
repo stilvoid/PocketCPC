@@ -25,6 +25,7 @@ REQUIRED_FILES = [
     FPGA / "core" / "cpc_virtual_keyboard_overlay.sv",
     FPGA / "core" / "dpram.v",
     FPGA / "core" / "pocket_dataslot_loader.sv",
+    FPGA / "core" / "pocket_fdc_dataslot.sv",
     FPGA / "core" / "pocket_bridge_regs.sv",
     FPGA / "cpc" / "cpc_machine_pocket.sv",
     FPGA / "cpc" / "cpc_ram_rom.sv",
@@ -34,6 +35,7 @@ REQUIRED_FILES = [
     FPGA / "cpc" / "UM6845R.v",
     FPGA / "cpc" / "i8255.v",
     FPGA / "cpc" / "YM2149.sv",
+    FPGA / "cpc" / "u765" / "u765.sv",
     FPGA / "cpc" / "crt_filter.v",
     FPGA / "cpc" / "hid.sv",
     FPGA / "cpc" / "T80" / "T80.qip",
@@ -60,6 +62,7 @@ ALLOWED_QSF_SOURCES = {
     "cpc/UM6845R.v",
     "cpc/i8255.v",
     "cpc/YM2149.sv",
+    "cpc/u765/u765.sv",
     "cpc/crt_filter.v",
     "cpc/hid.sv",
     "core/dpram.v",
@@ -70,6 +73,7 @@ ALLOWED_QSF_SOURCES = {
     "core/core_top.sv",
     "core/core_bridge_cmd.v",
     "core/pocket_dataslot_loader.sv",
+    "core/pocket_fdc_dataslot.sv",
     "core/pocket_bridge_regs.sv",
 }
 

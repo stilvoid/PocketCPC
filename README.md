@@ -37,6 +37,8 @@ When the two references overlap, prefer this split:
 - `docs/RISKS.md`: risk register and mitigation plan.
 - `docs/APF_BRIDGE_DESIGN.md`: proposed APF bridge/register design.
 - `docs/ROM_ASSET_LAYOUT.md`: proposed asset layout for CPC ROMs/media.
+- `docs/DEVELOPER_GUIDE.md`: architecture and code-reading guide for developers
+  who are new to FPGA/Verilog/Pocket core development.
 - `codex/TASKS.md`: Codex-ready task list.
 - `codex/PROMPTS.md`: prompts to paste into Codex for each phase.
 - `src/apf_amstrad_skeleton`: active APF Amstrad CPC skeleton.

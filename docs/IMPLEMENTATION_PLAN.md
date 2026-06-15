@@ -7,6 +7,13 @@ Use the ZX Spectrum Pocket core for APF/Pocket mechanics and the MiSTer Amstrad
 CPC core for CPC machine behavior. New local HDL should be adapter code unless
 the relevant behavior is absent from both references.
 
+Also follow the build/test discipline in the steering file: do not build,
+install, or ask the user to test an artefact that should only reproduce
+hardware behavior already observed unless the immediate goal is to recover the
+Pocket to that known state for comparison or recovery. Apply the same rule to
+commits: only commit after a Pocket-tested improvement has been confirmed, and
+do not commit regressions or merely unverified changes.
+
 ## Phase 0: Local setup and audit
 
 1. Clone both upstream projects into `upstreams/`.
