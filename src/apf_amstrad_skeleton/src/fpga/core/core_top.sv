@@ -337,6 +337,8 @@ wire [15:0] cont3_trig_cpc;
 wire [10:0] cpc_ps2_key;
 wire [6:0]  cpc_joy1;
 wire [6:0]  cpc_joy2;
+wire [7:0]  cpc_audio_l;
+wire [7:0]  cpc_audio_r;
 wire        cpc_vkb_active;
 wire [5:0]  cpc_vkb_index;
 wire [1:0]  cpc_vkb_page;
@@ -403,6 +405,8 @@ cpc_machine_pocket cpc_machine (
     .video_phase_n   ( cpc_video_phase_n ),
     .video_phase_p   ( cpc_video_phase_p ),
     .video_mode      ( cpc_video_mode ),
+    .audio_left      ( cpc_audio_l ),
+    .audio_right     ( cpc_audio_r ),
     .cpu_addr_debug  ( cpc_cpu_addr_debug ),
     .mem_rd_debug    ( cpc_mem_rd_debug ),
     .mem_wr_debug    ( cpc_mem_wr_debug )
@@ -554,19 +558,65 @@ assign video_vs           = cpc_rom_loaded ? cpc_native_vs : ~v_sync;
 assign video_rgb_clock    = cpc_apf_pixel_clk;
 assign video_rgb_clock_90 = cpc_apf_pixel_clk_90;
 
-reg [10:0] audio_div = 11'd0;
-reg        audio_lr  = 1'b0;
+wire [31:0] cpc_audio_sample = {{cpc_audio_l, 8'h00}, {cpc_audio_r, 8'h00}};
+wire [31:0] cpc_audio_sample_mclk;
+wire        cpc_audio_sample_mclk_strobe;
+wire        cpc_audio_pll_locked;
+wire        cpc_audio_pll_rst = !core_reset_n;
+reg  [31:0] cpc_audio_sample_prev = 32'd0;
+reg         cpc_audio_sample_write = 1'b0;
+reg  [15:0] cpc_audio_l_mclk = 16'd0;
+reg  [15:0] cpc_audio_r_mclk = 16'd0;
 
-always @(posedge clk_74a) begin
-    audio_div <= audio_div + 11'd1;
-    if (audio_div == 11'd0) begin
-        audio_lr <= ~audio_lr;
+always @(posedge cpc_clk) begin
+    if (!cpc_reset_n || !cpc_rom_loaded) begin
+        cpc_audio_sample_prev  <= 32'd0;
+        cpc_audio_sample_write <= 1'b0;
+    end else begin
+        cpc_audio_sample_write <= 1'b0;
+        if (cpc_ce_16 && (cpc_audio_sample != cpc_audio_sample_prev)) begin
+            cpc_audio_sample_prev  <= cpc_audio_sample;
+            cpc_audio_sample_write <= 1'b1;
+        end
     end
 end
 
-assign audio_mclk = clk_74a;
-assign audio_lrck = audio_lr;
-assign audio_dac  = 1'b0;
+mf_audio_pll cpc_audio_pll (
+    .refclk   ( clk_74b ),
+    .rst      ( cpc_audio_pll_rst ),
+    .outclk_0 ( audio_mclk ),
+    .outclk_1 ( ),
+    .locked   ( cpc_audio_pll_locked )
+);
+
+sync_fifo #(
+    .WIDTH(32)
+) cpc_audio_sync_fifo (
+    .clk_write  ( cpc_clk ),
+    .clk_read   ( audio_mclk ),
+    .write_en   ( cpc_audio_sample_write ),
+    .data       ( cpc_audio_sample ),
+    .data_s     ( cpc_audio_sample_mclk ),
+    .write_en_s ( cpc_audio_sample_mclk_strobe )
+);
+
+always @(posedge audio_mclk) begin
+    if (cpc_audio_sample_mclk_strobe) begin
+        cpc_audio_l_mclk <= cpc_audio_sample_mclk[31:16];
+        cpc_audio_r_mclk <= cpc_audio_sample_mclk[15:0];
+    end
+end
+
+sound_i2s #(
+    .CHANNEL_WIDTH(16),
+    .SIGNED_INPUT (0)
+) cpc_sound_i2s (
+    .audio_clk  ( audio_mclk ),
+    .audio_l    ( cpc_audio_l_mclk ),
+    .audio_r    ( cpc_audio_r_mclk ),
+    .audio_lrck ( audio_lrck ),
+    .audio_dac  ( audio_dac )
+);
 
 wire [31:0] control;
 wire [31:0] model_config;

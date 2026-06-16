@@ -51,6 +51,8 @@ module cpc_machine_pocket (
     output wire        video_phase_n,
     output wire        video_phase_p,
     output wire [1:0]  video_mode,
+    output wire [7:0]  audio_left,
+    output wire [7:0]  audio_right,
     output wire [15:0] cpu_addr_debug,
     output wire        mem_rd_debug,
     output wire        mem_wr_debug
@@ -102,6 +104,8 @@ reg         motor = 1'b0;
 reg         old_io_wr = 1'b0;
 reg  [2:0]  u765_div = 3'd0;
 reg         ce_u765 = 1'b0;
+reg  [7:0]  audio_left_r = 8'd0;
+reg  [7:0]  audio_right_r = 8'd0;
 
 // CPC6128 OS reads PPI port B bits 1..3 as active-low distributor jumpers.
 // On this wrapper, 4'b1111 selects the bundled ROM's "Amstrad" string.
@@ -115,6 +119,8 @@ assign mem_wr_debug   = mem_wr;
 assign video_phase_n  = phi_en_n;
 assign video_phase_p  = phi_en_p;
 assign video_mode     = mode;
+assign audio_left     = audio_left_r;
+assign audio_right    = audio_right_r;
 
 wire [15:0] vram_din;
 wire [255:0] rom_map;
@@ -227,6 +233,8 @@ always @(posedge clk) begin
         motor     <= 1'b0;
         u765_div  <= 3'd0;
         ce_u765   <= 1'b0;
+        audio_left_r  <= 8'd0;
+        audio_right_r <= 8'd0;
     end else begin
         old_io_wr <= io_wr;
         if (!old_io_wr && io_wr && !fdc_sel[3:1]) begin
@@ -235,6 +243,11 @@ always @(posedge clk) begin
 
         u765_div <= u765_div + 3'd1;
         ce_u765  <= !u765_div[2:0];
+
+        if (ce_16) begin
+            audio_left_r  <= audio_l;
+            audio_right_r <= audio_r;
+        end
     end
 end
 
