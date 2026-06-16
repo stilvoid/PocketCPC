@@ -17,11 +17,12 @@ module cpc_virtual_keyboard_overlay (
     output reg  [23:0] rgb_out
 );
 
-localparam [9:0] X0    = 10'd64;
+localparam [9:0] X0    = 10'd84;
 localparam [8:0] Y0    = 9'd168;
-localparam [9:0] X1    = X0 + 10'd640;
+localparam [9:0] KEY_W = 10'd40;
+localparam [9:0] X1    = X0 + 10'd600;
 localparam [8:0] Y1    = Y0 + 9'd64;
-localparam [5:0] GLYPH_X = 6'd27;
+localparam [5:0] GLYPH_X = 6'd15;
 localparam [3:0] GLYPH_Y = 4'd1;
 
 reg [9:0] x = 10'd0;
@@ -32,14 +33,16 @@ reg       vs_prev = 1'b0;
 wire       in_band = active && de && (x >= X0) && (x < X1) && (y >= Y0) && (y < Y1);
 wire [9:0] band_x  = x - X0;
 wire [8:0] band_y  = y - Y0;
-wire [3:0] key_col = band_x[9:6];
+wire [3:0] key_col = band_x / KEY_W;
 wire [1:0] key_row = band_y[5:4];
-wire [5:0] key_idx = ({4'd0, key_row} * 6'd10) + {2'd0, key_col};
-wire [5:0] local_x = band_x[5:0];
+wire [9:0] key_x0  = key_col * KEY_W;
+wire [5:0] key_idx = ({4'd0, key_row} * 6'd15) + {2'd0, key_col};
+wire [5:0] local_x = band_x - key_x0;
 wire [3:0] local_y = band_y[3:0];
 wire       selected = key_idx == selected_index;
-wire       shift_cell = (page == 2'd1) && (key_idx == 6'd4);
-wire       border = (local_x == 6'd0) || (local_x == 6'd63) ||
+wire       shift_cell = ((page == 2'd0) && (key_idx == 6'd46)) ||
+                        ((page == 2'd2) && (key_idx == 6'd4));
+wire       border = (local_x == 6'd0) || (local_x == 6'd39) ||
                     (local_y == 4'd0) || (local_y == 4'd15);
 wire [5:0] glyph_x_off = local_x - GLYPH_X;
 wire [3:0] glyph_y_off = local_y - GLYPH_Y;
@@ -71,140 +74,181 @@ function [7:0] key_index_to_char;
         case (key_page)
             2'd0: begin
                 case (key_index)
-                    6'd0:  key_index_to_char = 8'h31;
-                    6'd1:  key_index_to_char = 8'h32;
-                    6'd2:  key_index_to_char = 8'h33;
-                    6'd3:  key_index_to_char = 8'h34;
-                    6'd4:  key_index_to_char = 8'h35;
-                    6'd5:  key_index_to_char = 8'h36;
-                    6'd6:  key_index_to_char = 8'h37;
-                    6'd7:  key_index_to_char = 8'h38;
-                    6'd8:  key_index_to_char = 8'h39;
-                    6'd9:  key_index_to_char = 8'h30;
-                    6'd10: key_index_to_char = 8'h71;
-                    6'd11: key_index_to_char = 8'h77;
-                    6'd12: key_index_to_char = 8'h65;
-                    6'd13: key_index_to_char = 8'h72;
-                    6'd14: key_index_to_char = 8'h74;
-                    6'd15: key_index_to_char = 8'h79;
-                    6'd16: key_index_to_char = 8'h75;
-                    6'd17: key_index_to_char = 8'h69;
-                    6'd18: key_index_to_char = 8'h6F;
-                    6'd19: key_index_to_char = 8'h70;
-                    6'd20: key_index_to_char = 8'h61;
-                    6'd21: key_index_to_char = 8'h73;
-                    6'd22: key_index_to_char = 8'h64;
-                    6'd23: key_index_to_char = 8'h66;
-                    6'd24: key_index_to_char = 8'h67;
-                    6'd25: key_index_to_char = 8'h68;
-                    6'd26: key_index_to_char = 8'h6A;
-                    6'd27: key_index_to_char = 8'h6B;
-                    6'd28: key_index_to_char = 8'h6C;
-                    6'd29: key_index_to_char = 8'h3B;
-                    6'd30: key_index_to_char = 8'h7A;
-                    6'd31: key_index_to_char = 8'h78;
-                    6'd32: key_index_to_char = 8'h63;
-                    6'd33: key_index_to_char = 8'h76;
-                    6'd34: key_index_to_char = 8'h62;
-                    6'd35: key_index_to_char = 8'h6E;
-                    6'd36: key_index_to_char = 8'h6D;
-                    6'd37: key_index_to_char = 8'h2C;
-                    6'd38: key_index_to_char = 8'h2E;
-                    6'd39: key_index_to_char = 8'h2F;
+                    6'd0:  key_index_to_char = 8'h45; // Esc
+                    6'd1:  key_index_to_char = 8'h31;
+                    6'd2:  key_index_to_char = 8'h32;
+                    6'd3:  key_index_to_char = 8'h33;
+                    6'd4:  key_index_to_char = 8'h34;
+                    6'd5:  key_index_to_char = 8'h35;
+                    6'd6:  key_index_to_char = 8'h36;
+                    6'd7:  key_index_to_char = 8'h37;
+                    6'd8:  key_index_to_char = 8'h38;
+                    6'd9:  key_index_to_char = 8'h39;
+                    6'd10: key_index_to_char = 8'h30;
+                    6'd11: key_index_to_char = 8'h2D;
+                    6'd12: key_index_to_char = 8'h5E;
+                    6'd13: key_index_to_char = 8'h43; // CLR
+                    6'd14: key_index_to_char = 8'h44; // Del
+
+                    6'd15: key_index_to_char = 8'h54; // Tab
+                    6'd16: key_index_to_char = 8'h71;
+                    6'd17: key_index_to_char = 8'h77;
+                    6'd18: key_index_to_char = 8'h65;
+                    6'd19: key_index_to_char = 8'h72;
+                    6'd20: key_index_to_char = 8'h74;
+                    6'd21: key_index_to_char = 8'h79;
+                    6'd22: key_index_to_char = 8'h75;
+                    6'd23: key_index_to_char = 8'h69;
+                    6'd24: key_index_to_char = 8'h6F;
+                    6'd25: key_index_to_char = 8'h70;
+                    6'd26: key_index_to_char = 8'h40;
+                    6'd27: key_index_to_char = 8'h5B;
+                    6'd28: key_index_to_char = 8'h0D;
+
+                    6'd30: key_index_to_char = 8'h4B; // Caps
+                    6'd31: key_index_to_char = 8'h61;
+                    6'd32: key_index_to_char = 8'h73;
+                    6'd33: key_index_to_char = 8'h64;
+                    6'd34: key_index_to_char = 8'h66;
+                    6'd35: key_index_to_char = 8'h67;
+                    6'd36: key_index_to_char = 8'h68;
+                    6'd37: key_index_to_char = 8'h6A;
+                    6'd38: key_index_to_char = 8'h6B;
+                    6'd39: key_index_to_char = 8'h6C;
+                    6'd40: key_index_to_char = 8'h3A;
+                    6'd41: key_index_to_char = 8'h3B;
+                    6'd42: key_index_to_char = 8'h5D;
+                    6'd43: key_index_to_char = 8'h50; // Copy
+
+                    6'd45: key_index_to_char = 8'h43; // Ctrl
+                    6'd46: key_index_to_char = 8'h53; // Shift
+                    6'd47: key_index_to_char = 8'h7A;
+                    6'd48: key_index_to_char = 8'h78;
+                    6'd49: key_index_to_char = 8'h63;
+                    6'd50: key_index_to_char = 8'h76;
+                    6'd51: key_index_to_char = 8'h62;
+                    6'd52: key_index_to_char = 8'h6E;
+                    6'd53: key_index_to_char = 8'h6D;
+                    6'd54: key_index_to_char = 8'h2C;
+                    6'd55: key_index_to_char = 8'h2E;
+                    6'd56: key_index_to_char = 8'h2F;
+                    6'd57: key_index_to_char = 8'h5C;
+                    6'd59: key_index_to_char = 8'h0D;
                     default: key_index_to_char = 8'h20;
                 endcase
             end
             2'd1: begin
+                case (key_index)
+                    6'd0:  key_index_to_char = 8'h37;
+                    6'd1:  key_index_to_char = 8'h38;
+                    6'd2:  key_index_to_char = 8'h39;
+                    6'd4:  key_index_to_char = 8'h55; // Up
+                    6'd15: key_index_to_char = 8'h34;
+                    6'd16: key_index_to_char = 8'h35;
+                    6'd17: key_index_to_char = 8'h36;
+                    6'd18: key_index_to_char = 8'h4C; // Left
+                    6'd19: key_index_to_char = 8'h50; // Copy
+                    6'd20: key_index_to_char = 8'h52; // Right
+                    6'd30: key_index_to_char = 8'h31;
+                    6'd31: key_index_to_char = 8'h32;
+                    6'd32: key_index_to_char = 8'h33;
+                    6'd34: key_index_to_char = 8'h44; // Down
+                    6'd45: key_index_to_char = 8'h30;
+                    6'd46: key_index_to_char = 8'h0D;
+                    6'd47: key_index_to_char = 8'h2E;
+                    6'd48: key_index_to_char = 8'h43; // CLR
+                    6'd49: key_index_to_char = 8'h44; // Del
+                    default: key_index_to_char = 8'h20;
+                endcase
+            end
+            2'd2: begin
                 case (key_index)
                     6'd0:  key_index_to_char = 8'h45; // Esc
                     6'd1:  key_index_to_char = 8'h54; // Tab
                     6'd2:  key_index_to_char = 8'h4B; // Caps
                     6'd3:  key_index_to_char = 8'h43; // Ctrl
                     6'd4:  key_index_to_char = 8'h53; // Shift
-                    6'd5:  key_index_to_char = 8'h52; // Return
-                    6'd6:  key_index_to_char = 8'h44; // Del
-                    6'd7:  key_index_to_char = 8'h20; // Space
-                    6'd8:  key_index_to_char = 8'h50; // Copy
-                    6'd9:  key_index_to_char = 8'h4C; // CLR
-                    6'd10: key_index_to_char = 8'h40;
-                    6'd11: key_index_to_char = 8'h5B;
-                    6'd12: key_index_to_char = 8'h5D;
-                    6'd13: key_index_to_char = 8'h5C;
-                    6'd14: key_index_to_char = 8'h2D;
-                    6'd15: key_index_to_char = 8'h2B;
-                    6'd16: key_index_to_char = 8'h3B;
+                    6'd5:  key_index_to_char = 8'h50; // Copy
+                    6'd7:  key_index_to_char = 8'h0D;
+                    6'd8:  key_index_to_char = 8'h0D;
+                    6'd9:  key_index_to_char = 8'h44; // Del
+                    6'd10: key_index_to_char = 8'h43; // CLR
+                    6'd11: key_index_to_char = 8'h2D;
+                    6'd12: key_index_to_char = 8'h5E;
+                    6'd13: key_index_to_char = 8'h40;
+                    6'd14: key_index_to_char = 8'h5B;
+                    6'd15: key_index_to_char = 8'h5D;
+                    6'd16: key_index_to_char = 8'h5C;
                     6'd17: key_index_to_char = 8'h3A;
-                    6'd18: key_index_to_char = 8'h2F;
-                    6'd19: key_index_to_char = 8'h2E;
-                    6'd20: key_index_to_char = 8'h2C;
-                    default: key_index_to_char = 8'h20;
-                endcase
-            end
-            2'd2: begin
-                case (key_index)
-                    6'd0:  key_index_to_char = 8'h30; // F0
-                    6'd1:  key_index_to_char = 8'h31; // F1
-                    6'd2:  key_index_to_char = 8'h32; // F2
-                    6'd3:  key_index_to_char = 8'h33; // F3
-                    6'd4:  key_index_to_char = 8'h34; // F4
-                    6'd5:  key_index_to_char = 8'h35; // F5
-                    6'd6:  key_index_to_char = 8'h36; // F6
-                    6'd7:  key_index_to_char = 8'h37; // F7
-                    6'd8:  key_index_to_char = 8'h38; // F8
-                    6'd9:  key_index_to_char = 8'h39; // F9
-                    6'd10: key_index_to_char = 8'h55; // Up
-                    6'd11: key_index_to_char = 8'h4C; // Left
-                    6'd12: key_index_to_char = 8'h44; // Down
-                    6'd13: key_index_to_char = 8'h52; // Right
-                    6'd14: key_index_to_char = 8'h45; // keypad Enter
-                    6'd15: key_index_to_char = 8'h2E; // keypad .
-                    6'd16: key_index_to_char = 8'h50; // Copy
-                    6'd17: key_index_to_char = 8'h43; // CLR
+                    6'd18: key_index_to_char = 8'h3B;
+                    6'd19: key_index_to_char = 8'h2C;
+                    6'd20: key_index_to_char = 8'h2E;
+                    6'd21: key_index_to_char = 8'h2F;
                     default: key_index_to_char = 8'h20;
                 endcase
             end
             2'd3: begin
                 case (key_index)
-                    6'd0:  key_index_to_char = 8'h21; // !
-                    6'd1:  key_index_to_char = 8'h22; // "
-                    6'd2:  key_index_to_char = 8'h23; // #
-                    6'd3:  key_index_to_char = 8'h24; // $
-                    6'd4:  key_index_to_char = 8'h25; // %
-                    6'd5:  key_index_to_char = 8'h26; // &
-                    6'd6:  key_index_to_char = 8'h27; // '
-                    6'd7:  key_index_to_char = 8'h28; // (
-                    6'd8:  key_index_to_char = 8'h29; // )
-                    6'd9:  key_index_to_char = 8'h5F; // _
-                    6'd10: key_index_to_char = 8'h51;
-                    6'd11: key_index_to_char = 8'h57;
-                    6'd12: key_index_to_char = 8'h45;
-                    6'd13: key_index_to_char = 8'h52;
-                    6'd14: key_index_to_char = 8'h54;
-                    6'd15: key_index_to_char = 8'h59;
-                    6'd16: key_index_to_char = 8'h55;
-                    6'd17: key_index_to_char = 8'h49;
-                    6'd18: key_index_to_char = 8'h4F;
-                    6'd19: key_index_to_char = 8'h50;
-                    6'd20: key_index_to_char = 8'h41;
-                    6'd21: key_index_to_char = 8'h53;
-                    6'd22: key_index_to_char = 8'h44;
-                    6'd23: key_index_to_char = 8'h46;
-                    6'd24: key_index_to_char = 8'h47;
-                    6'd25: key_index_to_char = 8'h48;
-                    6'd26: key_index_to_char = 8'h4A;
-                    6'd27: key_index_to_char = 8'h4B;
-                    6'd28: key_index_to_char = 8'h4C;
-                    6'd29: key_index_to_char = 8'h2B; // +
-                    6'd30: key_index_to_char = 8'h5A;
-                    6'd31: key_index_to_char = 8'h58;
-                    6'd32: key_index_to_char = 8'h43;
-                    6'd33: key_index_to_char = 8'h56;
-                    6'd34: key_index_to_char = 8'h42;
-                    6'd35: key_index_to_char = 8'h4E;
-                    6'd36: key_index_to_char = 8'h4D;
-                    6'd37: key_index_to_char = 8'h3C; // <
-                    6'd38: key_index_to_char = 8'h3E; // >
-                    6'd39: key_index_to_char = 8'h3F; // ?
+                    6'd0:  key_index_to_char = 8'h45; // Esc
+                    6'd1:  key_index_to_char = 8'h21;
+                    6'd2:  key_index_to_char = 8'h22;
+                    6'd3:  key_index_to_char = 8'h23;
+                    6'd4:  key_index_to_char = 8'h24;
+                    6'd5:  key_index_to_char = 8'h25;
+                    6'd6:  key_index_to_char = 8'h26;
+                    6'd7:  key_index_to_char = 8'h27;
+                    6'd8:  key_index_to_char = 8'h28;
+                    6'd9:  key_index_to_char = 8'h29;
+                    6'd10: key_index_to_char = 8'h5F;
+                    6'd11: key_index_to_char = 8'h3D;
+                    6'd12: key_index_to_char = 8'hA3;
+                    6'd13: key_index_to_char = 8'h43; // CLR
+                    6'd14: key_index_to_char = 8'h44; // Del
+
+                    6'd15: key_index_to_char = 8'h54; // Tab
+                    6'd16: key_index_to_char = 8'h51;
+                    6'd17: key_index_to_char = 8'h57;
+                    6'd18: key_index_to_char = 8'h45;
+                    6'd19: key_index_to_char = 8'h52;
+                    6'd20: key_index_to_char = 8'h54;
+                    6'd21: key_index_to_char = 8'h59;
+                    6'd22: key_index_to_char = 8'h55;
+                    6'd23: key_index_to_char = 8'h49;
+                    6'd24: key_index_to_char = 8'h4F;
+                    6'd25: key_index_to_char = 8'h50;
+                    6'd26: key_index_to_char = 8'h7C;
+                    6'd27: key_index_to_char = 8'h7B;
+                    6'd28: key_index_to_char = 8'h0D;
+
+                    6'd30: key_index_to_char = 8'h4B; // Caps
+                    6'd31: key_index_to_char = 8'h41;
+                    6'd32: key_index_to_char = 8'h53;
+                    6'd33: key_index_to_char = 8'h44;
+                    6'd34: key_index_to_char = 8'h46;
+                    6'd35: key_index_to_char = 8'h47;
+                    6'd36: key_index_to_char = 8'h48;
+                    6'd37: key_index_to_char = 8'h4A;
+                    6'd38: key_index_to_char = 8'h4B;
+                    6'd39: key_index_to_char = 8'h4C;
+                    6'd40: key_index_to_char = 8'h2A;
+                    6'd41: key_index_to_char = 8'h2B;
+                    6'd42: key_index_to_char = 8'h7D;
+                    6'd43: key_index_to_char = 8'h50; // Copy
+
+                    6'd45: key_index_to_char = 8'h43; // Ctrl
+                    6'd46: key_index_to_char = 8'h53; // Shift
+                    6'd47: key_index_to_char = 8'h5A;
+                    6'd48: key_index_to_char = 8'h58;
+                    6'd49: key_index_to_char = 8'h43;
+                    6'd50: key_index_to_char = 8'h56;
+                    6'd51: key_index_to_char = 8'h42;
+                    6'd52: key_index_to_char = 8'h4E;
+                    6'd53: key_index_to_char = 8'h4D;
+                    6'd54: key_index_to_char = 8'h3C;
+                    6'd55: key_index_to_char = 8'h3E;
+                    6'd56: key_index_to_char = 8'h3F;
+                    6'd57: key_index_to_char = 8'h5C;
+                    6'd59: key_index_to_char = 8'h0D;
                     default: key_index_to_char = 8'h20;
                 endcase
             end
@@ -229,6 +273,7 @@ function [4:0] glyph_row_bits;
             8'h37: case (row) 3'd0: glyph_row_bits = 5'b11111; 3'd1: glyph_row_bits = 5'b00001; 3'd2: glyph_row_bits = 5'b00010; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b01000; 3'd5: glyph_row_bits = 5'b01000; 3'd6: glyph_row_bits = 5'b01000; default: glyph_row_bits = 5'b00000; endcase
             8'h38: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10001; 3'd3: glyph_row_bits = 5'b01110; 3'd4: glyph_row_bits = 5'b10001; 3'd5: glyph_row_bits = 5'b10001; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
             8'h39: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10001; 3'd3: glyph_row_bits = 5'b01111; 3'd4: glyph_row_bits = 5'b00001; 3'd5: glyph_row_bits = 5'b00001; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
+            8'h0D: case (row) 3'd0: glyph_row_bits = 5'b00010; 3'd1: glyph_row_bits = 5'b00010; 3'd2: glyph_row_bits = 5'b11111; 3'd3: glyph_row_bits = 5'b00110; 3'd4: glyph_row_bits = 5'b01010; 3'd5: glyph_row_bits = 5'b00010; 3'd6: glyph_row_bits = 5'b00010; default: glyph_row_bits = 5'b00000; endcase
             8'h2B: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b11111; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b00000; default: glyph_row_bits = 5'b00000; endcase
             8'h2D: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00000; 3'd2: glyph_row_bits = 5'b00000; 3'd3: glyph_row_bits = 5'b11111; 3'd4: glyph_row_bits = 5'b00000; 3'd5: glyph_row_bits = 5'b00000; 3'd6: glyph_row_bits = 5'b00000; default: glyph_row_bits = 5'b00000; endcase
             8'h21: case (row) 3'd0: glyph_row_bits = 5'b00100; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00000; 3'd6: glyph_row_bits = 5'b00100; default: glyph_row_bits = 5'b00000; endcase
@@ -305,9 +350,13 @@ function [4:0] glyph_row_bits;
             8'h2E: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00000; 3'd2: glyph_row_bits = 5'b00000; 3'd3: glyph_row_bits = 5'b00000; 3'd4: glyph_row_bits = 5'b00000; 3'd5: glyph_row_bits = 5'b01100; 3'd6: glyph_row_bits = 5'b01100; default: glyph_row_bits = 5'b00000; endcase
             8'h2F: case (row) 3'd0: glyph_row_bits = 5'b00001; 3'd1: glyph_row_bits = 5'b00010; 3'd2: glyph_row_bits = 5'b00010; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b01000; 3'd5: glyph_row_bits = 5'b01000; 3'd6: glyph_row_bits = 5'b10000; default: glyph_row_bits = 5'b00000; endcase
             8'h40: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b10001; 3'd2: glyph_row_bits = 5'b10111; 3'd3: glyph_row_bits = 5'b10101; 3'd4: glyph_row_bits = 5'b10111; 3'd5: glyph_row_bits = 5'b10000; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
+            8'h3D: case (row) 3'd0: glyph_row_bits = 5'b00000; 3'd1: glyph_row_bits = 5'b00000; 3'd2: glyph_row_bits = 5'b11111; 3'd3: glyph_row_bits = 5'b00000; 3'd4: glyph_row_bits = 5'b11111; 3'd5: glyph_row_bits = 5'b00000; 3'd6: glyph_row_bits = 5'b00000; default: glyph_row_bits = 5'b00000; endcase
             8'h5B: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b01000; 3'd2: glyph_row_bits = 5'b01000; 3'd3: glyph_row_bits = 5'b01000; 3'd4: glyph_row_bits = 5'b01000; 3'd5: glyph_row_bits = 5'b01000; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
             8'h5C: case (row) 3'd0: glyph_row_bits = 5'b10000; 3'd1: glyph_row_bits = 5'b01000; 3'd2: glyph_row_bits = 5'b01000; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b00010; 3'd5: glyph_row_bits = 5'b00010; 3'd6: glyph_row_bits = 5'b00001; default: glyph_row_bits = 5'b00000; endcase
             8'h5D: case (row) 3'd0: glyph_row_bits = 5'b01110; 3'd1: glyph_row_bits = 5'b00010; 3'd2: glyph_row_bits = 5'b00010; 3'd3: glyph_row_bits = 5'b00010; 3'd4: glyph_row_bits = 5'b00010; 3'd5: glyph_row_bits = 5'b00010; 3'd6: glyph_row_bits = 5'b01110; default: glyph_row_bits = 5'b00000; endcase
+            8'h7B: case (row) 3'd0: glyph_row_bits = 5'b00010; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b01000; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b00010; default: glyph_row_bits = 5'b00000; endcase
+            8'h7C: case (row) 3'd0: glyph_row_bits = 5'b00100; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b00100; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b00100; default: glyph_row_bits = 5'b00000; endcase
+            8'h7D: case (row) 3'd0: glyph_row_bits = 5'b01000; 3'd1: glyph_row_bits = 5'b00100; 3'd2: glyph_row_bits = 5'b00100; 3'd3: glyph_row_bits = 5'b00010; 3'd4: glyph_row_bits = 5'b00100; 3'd5: glyph_row_bits = 5'b00100; 3'd6: glyph_row_bits = 5'b01000; default: glyph_row_bits = 5'b00000; endcase
             default: glyph_row_bits = 5'b00000;
         endcase
     end

@@ -50,9 +50,19 @@ reg [47:0] dock_keyboard_codes_sample = 48'd0;
 reg [1:0]  dock_keyboard_phase = 2'd3;
 reg [2:0]  dock_keyboard_index = 3'd0;
 
-// Leave joystick lines idle for this first keyboard-focused input path. The
-// Pocket buttons below are presented as CPC keyboard keys instead.
-assign joy1 = 7'd0;
+// Reuse the MiSTer CPC joystick bit ordering exactly as exposed by joydb.sv:
+// {fire3, fire2, fire1, up, down, left, right}. hid.sv performs its own final
+// row-local remap after this. Blank joystick activity while the virtual
+// keyboard overlay is open so overlay navigation doesn't leak into software.
+assign joy1 = vkb_active ? 7'd0 : {
+    buttons[6], // X -> fire 3
+    buttons[5], // B -> fire 2
+    buttons[4], // A -> fire 1
+    buttons[0], // D-pad up
+    buttons[1], // D-pad down
+    buttons[2], // D-pad left
+    buttons[3]  // D-pad right
+};
 assign joy2 = 7'd0;
 
 function [9:0] map_vkb_index_to_ps2;
@@ -63,94 +73,118 @@ function [9:0] map_vkb_index_to_ps2;
         case (page)
             2'd0: begin
                 case (key_index)
-                    6'd0:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h16}; // 1
-                    6'd1:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1E}; // 2
-                    6'd2:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h26}; // 3
-                    6'd3:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h25}; // 4
-                    6'd4:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2E}; // 5
-                    6'd5:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h36}; // 6
-                    6'd6:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3D}; // 7
-                    6'd7:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3E}; // 8
-                    6'd8:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h46}; // 9
-                    6'd9:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h45}; // 0
-                    6'd10: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h15}; // Q
-                    6'd11: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1D}; // W
-                    6'd12: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h24}; // E
-                    6'd13: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2D}; // R
-                    6'd14: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2C}; // T
-                    6'd15: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h35}; // Y
-                    6'd16: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3C}; // U
-                    6'd17: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h43}; // I
-                    6'd18: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h44}; // O
-                    6'd19: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4D}; // P
-                    6'd20: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1C}; // A
-                    6'd21: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1B}; // S
-                    6'd22: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h23}; // D
-                    6'd23: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2B}; // F
-                    6'd24: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h34}; // G
-                    6'd25: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h33}; // H
-                    6'd26: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3B}; // J
-                    6'd27: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h42}; // K
-                    6'd28: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4B}; // L
-                    6'd29: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h52}; // ;
-                    6'd30: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1A}; // Z
-                    6'd31: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h22}; // X
-                    6'd32: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h21}; // C
-                    6'd33: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2A}; // V
-                    6'd34: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h32}; // B
-                    6'd35: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h31}; // N
-                    6'd36: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3A}; // M
-                    6'd37: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
-                    6'd38: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
-                    6'd39: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
+                    6'd0:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h76}; // Esc
+                    6'd1:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h16}; // 1
+                    6'd2:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1E}; // 2
+                    6'd3:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h26}; // 3
+                    6'd4:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h25}; // 4
+                    6'd5:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2E}; // 5
+                    6'd6:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h36}; // 6
+                    6'd7:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3D}; // 7
+                    6'd8:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3E}; // 8
+                    6'd9:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h46}; // 9
+                    6'd10: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h45}; // 0
+                    6'd11: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4E}; // -
+                    6'd12: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h55}; // ^
+                    6'd13: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h71}; // CLR
+                    6'd14: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h66}; // Del
+
+                    6'd15: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0D}; // Tab
+                    6'd16: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h15}; // Q
+                    6'd17: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1D}; // W
+                    6'd18: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h24}; // E
+                    6'd19: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2D}; // R
+                    6'd20: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2C}; // T
+                    6'd21: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h35}; // Y
+                    6'd22: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3C}; // U
+                    6'd23: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h43}; // I
+                    6'd24: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h44}; // O
+                    6'd25: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4D}; // P
+                    6'd26: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h54}; // @
+                    6'd27: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5B}; // [
+                    6'd28: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5A}; // Return
+
+                    6'd30: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h58}; // Caps Lock
+                    6'd31: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1C}; // A
+                    6'd32: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1B}; // S
+                    6'd33: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h23}; // D
+                    6'd34: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2B}; // F
+                    6'd35: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h34}; // G
+                    6'd36: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h33}; // H
+                    6'd37: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3B}; // J
+                    6'd38: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h42}; // K
+                    6'd39: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4B}; // L
+                    6'd40: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4C}; // :
+                    6'd41: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h52}; // ;
+                    6'd42: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5D}; // ]
+                    6'd43: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h70}; // Copy
+
+                    6'd45: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h14}; // Ctrl
+                    6'd46: map_vkb_index_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Shift
+                    6'd47: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1A}; // Z
+                    6'd48: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h22}; // X
+                    6'd49: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h21}; // C
+                    6'd50: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2A}; // V
+                    6'd51: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h32}; // B
+                    6'd52: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h31}; // N
+                    6'd53: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3A}; // M
+                    6'd54: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
+                    6'd55: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
+                    6'd56: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
+                    6'd57: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h61}; // backslash
+                    6'd58: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h29}; // Space
+                    6'd59: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h69}; // Enter
                     default: map_vkb_index_to_ps2 = 10'd0;
                 endcase
             end
             2'd1: begin
                 case (key_index)
-                    6'd0:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h76}; // Esc
-                    6'd1:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0D}; // Tab
-                    6'd2:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h58}; // Caps Lock
-                    6'd3:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h14}; // Ctrl
-                    6'd5:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5A}; // Enter
-                    6'd6:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h66}; // Del
-                    6'd7:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h29}; // Space
-                    6'd8:  map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h70}; // Copy
-                    6'd9:  map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h71}; // CLR
-                    6'd10: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h54}; // @
-                    6'd11: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5B}; // [
-                    6'd12: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5D}; // ]
-                    6'd13: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h61}; // backslash
-                    6'd14: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4E}; // -
-                    6'd15: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h55}; // +
-                    6'd16: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h52}; // ;
-                    6'd17: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4C}; // :
-                    6'd18: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
-                    6'd19: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
-                    6'd20: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
+                    6'd0:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h83}; // F7
+                    6'd1:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0A}; // F8
+                    6'd2:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h01}; // F9
+                    6'd4:  map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h75}; // Up
+                    6'd15: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0C}; // F4
+                    6'd16: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h03}; // F5
+                    6'd17: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0B}; // F6
+                    6'd18: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h6B}; // Left
+                    6'd19: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h70}; // Copy
+                    6'd20: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h74}; // Right
+                    6'd30: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h05}; // F1
+                    6'd31: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h06}; // F2
+                    6'd32: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h04}; // F3
+                    6'd34: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h72}; // Down
+                    6'd45: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h09}; // F0
+                    6'd46: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h69}; // keypad Enter
+                    6'd47: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h7A}; // keypad .
+                    6'd48: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h71}; // CLR
+                    6'd49: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h66}; // Del
                     default: map_vkb_index_to_ps2 = 10'd0;
                 endcase
             end
             2'd2: begin
                 case (key_index)
-                    6'd0:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h09}; // F0
-                    6'd1:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h05}; // F1
-                    6'd2:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h06}; // F2
-                    6'd3:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h04}; // F3
-                    6'd4:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0C}; // F4
-                    6'd5:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h03}; // F5
-                    6'd6:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0B}; // F6
-                    6'd7:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h83}; // F7
-                    6'd8:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0A}; // F8
-                    6'd9:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h01}; // F9
-                    6'd10: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h75}; // Up
-                    6'd11: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h6B}; // Left
-                    6'd12: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h72}; // Down
-                    6'd13: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h74}; // Right
-                    6'd14: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h69}; // keypad Enter
-                    6'd15: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h7A}; // keypad .
-                    6'd16: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h70}; // Copy
-                    6'd17: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h71}; // CLR
+                    6'd0:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h76}; // Esc
+                    6'd1:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h0D}; // Tab
+                    6'd2:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h58}; // Caps Lock
+                    6'd3:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h14}; // Ctrl
+                    6'd4:  map_vkb_index_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Shift
+                    6'd5:  map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h70}; // Copy
+                    6'd6:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h29}; // Space
+                    6'd7:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5A}; // Return
+                    6'd8:  map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h69}; // Enter
+                    6'd9:  map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h66}; // Del
+                    6'd10: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h71}; // CLR
+                    6'd11: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4E}; // -
+                    6'd12: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h55}; // ^
+                    6'd13: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h54}; // @
+                    6'd14: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5B}; // [
+                    6'd15: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5D}; // ]
+                    6'd16: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h61}; // backslash
+                    6'd17: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4C}; // :
+                    6'd18: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h52}; // ;
+                    6'd19: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
+                    6'd20: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
+                    6'd21: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
                     default: map_vkb_index_to_ps2 = 10'd0;
                 endcase
             end
@@ -286,13 +320,13 @@ function [9:0] map_normal_button_to_ps2;
     input [3:0] button;
     begin
         case (button)
-            4'd0: map_normal_button_to_ps2 = {1'b1, 1'b1, 8'h75}; // D-pad up    -> Cursor up
-            4'd1: map_normal_button_to_ps2 = {1'b1, 1'b1, 8'h72}; // D-pad down  -> Cursor down
-            4'd2: map_normal_button_to_ps2 = {1'b1, 1'b1, 8'h6B}; // D-pad left  -> Cursor left
-            4'd3: map_normal_button_to_ps2 = {1'b1, 1'b1, 8'h74}; // D-pad right -> Cursor right
-            4'd4: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // A           -> Enter
-            4'd5: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // B           -> Space
-            4'd6: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h66}; // X           -> Delete/Backspace
+            4'd0: map_normal_button_to_ps2 = 10'd0; // D-pad up handled as joystick
+            4'd1: map_normal_button_to_ps2 = 10'd0; // D-pad down handled as joystick
+            4'd2: map_normal_button_to_ps2 = 10'd0; // D-pad left handled as joystick
+            4'd3: map_normal_button_to_ps2 = 10'd0; // D-pad right handled as joystick
+            4'd4: map_normal_button_to_ps2 = 10'd0; // A handled as joystick fire 1
+            4'd5: map_normal_button_to_ps2 = 10'd0; // B handled as joystick fire 2
+            4'd6: map_normal_button_to_ps2 = 10'd0; // X handled as joystick fire 3
             4'd7: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h76}; // Y           -> Escape
             4'd8: map_normal_button_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // L       -> Shift
             4'd9: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h14}; // R           -> Ctrl
@@ -308,8 +342,8 @@ function [9:0] map_vkb_button_to_ps2;
         case (button)
             4'd4: map_vkb_button_to_ps2 = is_pressed ? map_vkb_index_to_ps2(vkb_index, vkb_page) : {1'b1, vkb_a_ps2};
             4'd5: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // B -> Space
-            4'd6: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h66}; // X -> Delete/Backspace
-            4'd7: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h76}; // Y -> Escape
+            4'd6: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // X -> Return
+            4'd7: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h66}; // Y -> Delete/Backspace
             default: map_vkb_button_to_ps2 = 10'd0;
         endcase
     end
@@ -319,7 +353,8 @@ function vkb_is_shift_key;
     input [5:0] key_index;
     input [1:0] page;
     begin
-        vkb_is_shift_key = (page == 2'd1) && (key_index == 6'd4);
+        vkb_is_shift_key = ((page == 2'd0) && (key_index == 6'd46)) ||
+                           ((page == 2'd2) && (key_index == 6'd4));
     end
 endfunction
 
@@ -417,20 +452,20 @@ always @(posedge clk) begin
                 else vkb_page <= vkb_page + 2'd1;
             end
 
-            if (pressed[0] && (vkb_index >= 6'd10)) vkb_index <= vkb_index - 6'd10;
-            if (pressed[1] && (vkb_index <  6'd30)) vkb_index <= vkb_index + 6'd10;
+            if (pressed[0] && (vkb_index >= 6'd15)) vkb_index <= vkb_index - 6'd15;
+            if (pressed[1] && (vkb_index <  6'd45)) vkb_index <= vkb_index + 6'd15;
             if (pressed[2]) begin
-                if (vkb_index == 6'd0) vkb_index <= 6'd9;
-                else if (vkb_index == 6'd10) vkb_index <= 6'd19;
-                else if (vkb_index == 6'd20) vkb_index <= 6'd29;
-                else if (vkb_index == 6'd30) vkb_index <= 6'd39;
+                if (vkb_index == 6'd0) vkb_index <= 6'd14;
+                else if (vkb_index == 6'd15) vkb_index <= 6'd29;
+                else if (vkb_index == 6'd30) vkb_index <= 6'd44;
+                else if (vkb_index == 6'd45) vkb_index <= 6'd59;
                 else vkb_index <= vkb_index - 6'd1;
             end
             if (pressed[3]) begin
-                if (vkb_index == 6'd9) vkb_index <= 6'd0;
-                else if (vkb_index == 6'd19) vkb_index <= 6'd10;
-                else if (vkb_index == 6'd29) vkb_index <= 6'd20;
-                else if (vkb_index == 6'd39) vkb_index <= 6'd30;
+                if (vkb_index == 6'd14) vkb_index <= 6'd0;
+                else if (vkb_index == 6'd29) vkb_index <= 6'd15;
+                else if (vkb_index == 6'd44) vkb_index <= 6'd30;
+                else if (vkb_index == 6'd59) vkb_index <= 6'd45;
                 else vkb_index <= vkb_index + 6'd1;
             end
         end
