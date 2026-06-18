@@ -230,7 +230,16 @@ reg [31:0] i_seek_pos;
 reg        i_write_prev;
 
 always @(posedge clk_sys) begin : sdcontrol
-
+		if (reset) begin
+			ack <= 6'd0;
+			sd_lba <= 32'd0;
+			sd_rd <= 2'b00;
+			sd_wr <= 2'b00;
+			sd_busy_mount <= 1'b0;
+			sd_busy_tinfo <= 1'b0;
+			sd_busy_sector <= 1'b0;
+			sd_buff_type <= UPD765_SD_BUFF_SECTOR;
+		end else begin
 		ack <= {ack[4:0], sd_ack};
 		if(ack[5:4] == 'b01)	begin
 			sd_rd <= 0;
@@ -264,6 +273,7 @@ always @(posedge clk_sys) begin : sdcontrol
 				sd_buff_type <= UPD765_SD_BUFF_SECTOR;
 				sd_busy_sector <= 1;
 			end
+		end
 		end
 end
 
@@ -472,10 +482,12 @@ always @(posedge clk_sys) begin : fdc
 		sd_rd_sector <= 0;
 		sd_wr_sector <= 0;
 		m_status <= 8'h80;
+		m_data <= 8'h00;
 		state <= COMMAND_IDLE;
 		status[0] <= 0;
 		status[1] <= 0;
 		status[2] <= 0;
+		status[3] <= 0;
 		ncn <= '{ 0, 0 };
 		pcn <= '{ 0, 0 };
 		int_state <= '{ 0, 0 };
@@ -485,6 +497,20 @@ always @(posedge clk_sys) begin : fdc
 		image_trackinfo_dirty <= '{ 1, 1 };
 		i_secinfo_valid <= '{ '{ 0, 0}, '{ 0, 0} };
 		image_track_offsets_wr <= 0;
+		old_wr <= 1'b0;
+		old_rd <= 1'b0;
+		ds0 <= 1'b0;
+		hds <= 1'b0;
+		tinfo_ds0 <= 1'b0;
+		tinfo_hds <= 1'b0;
+		buff_addr <= 9'd0;
+		tinfo_addr <= 9'd0;
+		buff_wr <= 1'b0;
+		buff_wait <= 1'b0;
+		tinfo_wait <= 1'b0;
+		i_current_drive <= 1'b0;
+		i_byte_clk_cnt <= 8'd0;
+		i_byte_clk_en <= 1'b0;
 		//restart "mounting" of image(s)
 		if (image_scan_state[0]) image_scan_state[0] <= 1;
 		if (image_scan_state[1]) image_scan_state[1] <= 1;

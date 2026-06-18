@@ -19,13 +19,17 @@ module cpc_pocket_input (
     output wire [6:0]  joy1,
     output wire [6:0]  joy2,
     output reg         vkb_active,
-    output reg  [5:0]  vkb_index,
+    output reg  [6:0]  vkb_index,
     output reg  [1:0]  vkb_page,
-    output reg         vkb_shift
+    output reg         vkb_shift,
+    output reg         vkb_ctrl,
+    output reg         vkb_caps,
+    output reg         vkb_caps_pulse
 );
 
 localparam [7:0] PS2_LSHIFT = 8'h12;
 localparam [7:0] PS2_CTRL   = 8'h14;
+localparam [22:0] VKB_CAPS_PULSE_CYCLES = 23'd7_999_999;
 
 wire [15:0] buttons = cont1_key[15:0];
 wire [15:0] changed = buttons ^ buttons_prev;
@@ -43,6 +47,7 @@ wire [47:0] dock_keyboard_codes = {
 reg [15:0] buttons_prev = 16'd0;
 reg [15:0] pending      = 16'd0;
 reg [8:0]  vkb_a_ps2    = {1'b0, 8'h16};
+reg [22:0] vkb_caps_pulse_timer = 23'd0;
 reg [7:0]  dock_keyboard_mods_active = 8'd0;
 reg [47:0] dock_keyboard_codes_active = 48'd0;
 reg [7:0]  dock_keyboard_mods_sample = 8'd0;
@@ -66,7 +71,7 @@ assign joy1 = vkb_active ? 7'd0 : {
 assign joy2 = 7'd0;
 
 function [9:0] map_vkb_index_to_ps2;
-    input [5:0] key_index;
+    input [6:0] key_index;
     input [1:0] page;
     begin
         map_vkb_index_to_ps2 = 10'd0;
@@ -117,23 +122,26 @@ function [9:0] map_vkb_index_to_ps2;
                     6'd40: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4C}; // :
                     6'd41: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h52}; // ;
                     6'd42: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5D}; // ]
-                    6'd43: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h70}; // Copy
+                    6'd43: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h5A}; // Return
 
-                    6'd45: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h14}; // Ctrl
-                    6'd46: map_vkb_index_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Shift
-                    6'd47: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1A}; // Z
-                    6'd48: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h22}; // X
-                    6'd49: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h21}; // C
-                    6'd50: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2A}; // V
-                    6'd51: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h32}; // B
-                    6'd52: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h31}; // N
-                    6'd53: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3A}; // M
-                    6'd54: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
-                    6'd55: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
-                    6'd56: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
-                    6'd57: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h61}; // backslash
-                    6'd58: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h29}; // Space
-                    6'd59: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h69}; // Enter
+                    7'd45: map_vkb_index_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Left Shift
+                    7'd47: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h1A}; // Z
+                    7'd48: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h22}; // X
+                    7'd49: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h21}; // C
+                    7'd50: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h2A}; // V
+                    7'd51: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h32}; // B
+                    7'd52: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h31}; // N
+                    7'd53: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h3A}; // M
+                    7'd54: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
+                    7'd55: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
+                    7'd56: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
+                    7'd57: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h61}; // backslash
+                    7'd58: map_vkb_index_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Right Shift
+
+                    7'd60: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h14}; // Ctrl
+                    7'd62: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h70}; // Copy
+                    7'd64: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h29}; // Space
+                    7'd71: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h69}; // Enter
                     default: map_vkb_index_to_ps2 = 10'd0;
                 endcase
             end
@@ -350,11 +358,64 @@ function [9:0] map_vkb_button_to_ps2;
 endfunction
 
 function vkb_is_shift_key;
-    input [5:0] key_index;
+    input [6:0] key_index;
     input [1:0] page;
     begin
-        vkb_is_shift_key = ((page == 2'd0) && (key_index == 6'd46)) ||
+        vkb_is_shift_key = ((page == 2'd0) && ((key_index == 7'd45) || (key_index == 7'd58))) ||
                            ((page == 2'd2) && (key_index == 6'd4));
+    end
+endfunction
+
+function vkb_is_ctrl_key;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_is_ctrl_key = ((page == 2'd0) && (key_index == 7'd60)) ||
+                          ((page == 2'd2) && (key_index == 6'd3));
+    end
+endfunction
+
+function vkb_is_caps_key;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_is_caps_key = ((page == 2'd0) && (key_index == 7'd30)) ||
+                          ((page == 2'd2) && (key_index == 6'd2));
+    end
+endfunction
+
+function [6:0] vkb_clamp_index;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_clamp_index = key_index;
+        if (page == 2'd0) begin
+            case (key_index)
+                7'd29: vkb_clamp_index = 7'd28;
+                7'd44: vkb_clamp_index = 7'd43;
+                7'd46: vkb_clamp_index = 7'd45;
+                7'd59: vkb_clamp_index = 7'd58;
+                7'd61: vkb_clamp_index = 7'd60;
+                7'd63: vkb_clamp_index = 7'd62;
+                7'd65, 7'd66, 7'd67, 7'd68, 7'd69, 7'd70: vkb_clamp_index = 7'd64;
+                7'd72, 7'd73, 7'd74: vkb_clamp_index = 7'd71;
+                default: vkb_clamp_index = key_index;
+            endcase
+        end
+    end
+endfunction
+
+function [6:0] vkb_page_last_index;
+    input [1:0] page;
+    begin
+        vkb_page_last_index = (page == 2'd0) ? 7'd74 : 7'd59;
+    end
+endfunction
+
+function [6:0] vkb_page_last_movable_row;
+    input [1:0] page;
+    begin
+        vkb_page_last_movable_row = (page == 2'd0) ? 7'd59 : 7'd44;
     end
 endfunction
 
@@ -389,7 +450,9 @@ always @(*) begin
         next_pending[11]  = 1'b0;
         next_pending[12]  = 1'b0;
         next_pending[13]  = 1'b0;
-        if (vkb_is_shift_key(vkb_index, vkb_page)) begin
+        if (vkb_is_shift_key(vkb_index, vkb_page) ||
+            vkb_is_ctrl_key(vkb_index, vkb_page) ||
+            vkb_is_caps_key(vkb_index, vkb_page)) begin
             next_pending[4] = 1'b0;
         end
     end
@@ -415,10 +478,14 @@ always @(posedge clk) begin
         pending      <= 16'd0;
         ps2_key      <= 11'd0;
         vkb_active   <= 1'b0;
-        vkb_index    <= 6'd0;
+        vkb_index    <= 7'd0;
         vkb_page     <= 2'd0;
         vkb_shift    <= 1'b0;
+        vkb_ctrl     <= 1'b0;
+        vkb_caps     <= 1'b0;
+        vkb_caps_pulse <= 1'b0;
         vkb_a_ps2    <= {1'b0, 8'h16};
+        vkb_caps_pulse_timer <= 23'd0;
         dock_keyboard_mods_active  <= 8'd0;
         dock_keyboard_codes_active <= 48'd0;
         dock_keyboard_mods_sample  <= 8'd0;
@@ -429,60 +496,89 @@ always @(posedge clk) begin
         buttons_prev <= buttons;
         pending      <= next_pending;
 
-        if (pressed[14]) begin
-            vkb_active <= ~vkb_active;
-            pending    <= 16'd0;
-            if (vkb_active && vkb_shift) begin
-                vkb_shift <= 1'b0;
-                ps2_key <= {~ps2_key[10], 1'b0, 1'b0, PS2_LSHIFT};
+        if (vkb_caps_pulse) begin
+            if (vkb_caps_pulse_timer == 23'd0) begin
+                vkb_caps_pulse <= 1'b0;
+            end else begin
+                vkb_caps_pulse_timer <= vkb_caps_pulse_timer - 23'd1;
             end
         end
 
-        if (vkb_active) begin
-            if (pressed[8]) begin
-                vkb_shift <= ~vkb_shift;
-                ps2_key <= {~ps2_key[10], !vkb_shift, 1'b0, PS2_LSHIFT};
-            end
-            if (pressed[4] && vkb_is_shift_key(vkb_index, vkb_page)) begin
-                vkb_shift <= ~vkb_shift;
-                ps2_key <= {~ps2_key[10], !vkb_shift, 1'b0, PS2_LSHIFT};
-            end
-            if (pressed[9]) begin
-                if (vkb_page == 2'd2) vkb_page <= 2'd0;
-                else vkb_page <= vkb_page + 2'd1;
+        begin
+            if (pressed[14]) begin
+                vkb_active <= ~vkb_active;
+                pending    <= 16'd0;
+                if (vkb_active && vkb_shift) begin
+                    vkb_shift <= 1'b0;
+                    ps2_key <= {~ps2_key[10], 1'b0, 1'b0, PS2_LSHIFT};
+                end
             end
 
-            if (pressed[0] && (vkb_index >= 6'd15)) vkb_index <= vkb_index - 6'd15;
-            if (pressed[1] && (vkb_index <  6'd45)) vkb_index <= vkb_index + 6'd15;
-            if (pressed[2]) begin
-                if (vkb_index == 6'd0) vkb_index <= 6'd14;
-                else if (vkb_index == 6'd15) vkb_index <= 6'd29;
-                else if (vkb_index == 6'd30) vkb_index <= 6'd44;
-                else if (vkb_index == 6'd45) vkb_index <= 6'd59;
-                else vkb_index <= vkb_index - 6'd1;
-            end
-            if (pressed[3]) begin
-                if (vkb_index == 6'd14) vkb_index <= 6'd0;
-                else if (vkb_index == 6'd29) vkb_index <= 6'd15;
-                else if (vkb_index == 6'd44) vkb_index <= 6'd30;
-                else if (vkb_index == 6'd59) vkb_index <= 6'd45;
-                else vkb_index <= vkb_index + 6'd1;
-            end
-        end
+            if (vkb_active) begin
+                if (pressed[8]) begin
+                    vkb_shift <= ~vkb_shift;
+                    ps2_key <= {~ps2_key[10], !vkb_shift, 1'b0, PS2_LSHIFT};
+                end
+                if (pressed[4] && vkb_is_shift_key(vkb_index, vkb_page)) begin
+                    vkb_shift <= ~vkb_shift;
+                    ps2_key <= {~ps2_key[10], !vkb_shift, 1'b0, PS2_LSHIFT};
+                end
+                if (pressed[4] && vkb_is_ctrl_key(vkb_index, vkb_page)) begin
+                    vkb_ctrl <= ~vkb_ctrl;
+                    ps2_key <= {~ps2_key[10], !vkb_ctrl, 1'b0, PS2_CTRL};
+                end
+                if (pressed[4] && vkb_is_caps_key(vkb_index, vkb_page)) begin
+                    if (!vkb_caps_pulse) begin
+                        vkb_caps <= ~vkb_caps;
+                        vkb_caps_pulse <= 1'b1;
+                        vkb_caps_pulse_timer <= VKB_CAPS_PULSE_CYCLES;
+                    end
+                end
+                if (pressed[9]) begin
+                    if (vkb_page == 2'd2) vkb_page <= 2'd0;
+                    else vkb_page <= vkb_page + 2'd1;
+                end
 
-        if (selected_valid) begin
-            pending[selected_button] <= 1'b0;
-            if (vkb_active && selected_button == 4'd4 && buttons[4]) begin
-                vkb_a_ps2 <= selected_ps2[8:0];
+                if (pressed[0] && (vkb_index >= 7'd15)) vkb_index <= vkb_clamp_index(vkb_index - 7'd15, vkb_page);
+                if (pressed[1] && (vkb_index <= vkb_page_last_movable_row(vkb_page))) vkb_index <= vkb_clamp_index(vkb_index + 7'd15, vkb_page);
+                if (pressed[2]) begin
+                    if (vkb_index == 7'd0) vkb_index <= 7'd14;
+                    else if (vkb_index == 7'd15) vkb_index <= vkb_clamp_index(7'd29, vkb_page);
+                    else if (vkb_index == 7'd30) vkb_index <= vkb_clamp_index(7'd44, vkb_page);
+                    else if (vkb_index == 7'd45) vkb_index <= vkb_clamp_index(7'd59, vkb_page);
+                    else if (vkb_index == 7'd60) vkb_index <= vkb_clamp_index(vkb_page_last_index(vkb_page), vkb_page);
+                    else vkb_index <= vkb_clamp_index(vkb_index - 6'd1, vkb_page);
+                end
+                if (pressed[3]) begin
+                    if (vkb_index == 7'd14) vkb_index <= 7'd0;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd28)) vkb_index <= 7'd15;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd43)) vkb_index <= 7'd30;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd45)) vkb_index <= 7'd47;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd58)) vkb_index <= 7'd45;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd60)) vkb_index <= 7'd62;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd62)) vkb_index <= 7'd64;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd64)) vkb_index <= 7'd71;
+                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd71)) vkb_index <= 7'd60;
+                    else if (vkb_index == 7'd29) vkb_index <= 7'd15;
+                    else if (vkb_index == 7'd44) vkb_index <= 7'd30;
+                    else if (vkb_index == 7'd59) vkb_index <= 7'd45;
+                    else vkb_index <= vkb_clamp_index(vkb_index + 6'd1, vkb_page);
+                end
             end
-            ps2_key <= {
-                ~ps2_key[10],
-                buttons[selected_button],
-                selected_ps2[8],
-                selected_ps2[7:0]
-            };
-        end else begin
-            case (dock_keyboard_phase)
+
+            if (selected_valid) begin
+                pending[selected_button] <= 1'b0;
+                if (vkb_active && selected_button == 4'd4 && buttons[4]) begin
+                    vkb_a_ps2 <= selected_ps2[8:0];
+                end
+                ps2_key <= {
+                    ~ps2_key[10],
+                    buttons[selected_button],
+                    selected_ps2[8],
+                    selected_ps2[7:0]
+                };
+            end else begin
+                case (dock_keyboard_phase)
                 2'd0: begin
                     if ((dock_keyboard_mods_sample[dock_keyboard_index] != dock_keyboard_mods_active[dock_keyboard_index]) &&
                         dock_modifier_ps2[9]) begin
@@ -540,7 +636,8 @@ always @(posedge clk) begin
                         end
                     end
                 end
-            endcase
+                endcase
+            end
         end
     end
 end

@@ -26,6 +26,7 @@ module Amstrad_motherboard
 	input   [6:0] joy2,
 	input         right_shift_mod,
 	input         keypad_mod,
+	input         vkb_caps_hold,
 	input  [10:0] ps2_key,
 	input  [24:0] ps2_mouse,
 	output        joy1_sel,
@@ -375,6 +376,7 @@ hid HID
 	
 	.right_shift_mod(right_shift_mod),
 	.keypad_mod(keypad_mod),
+	.vkb_caps_hold(vkb_caps_hold),
 
 	.ps2_key(ps2_key),
 	.ps2_mouse(ps2_mouse),

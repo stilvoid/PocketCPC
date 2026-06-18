@@ -27,6 +27,7 @@ module hid
 	input [24:0] ps2_mouse,
 	input        right_shift_mod,
 	input        keypad_mod,
+	input        vkb_caps_hold,
 
 	input  [6:0] joystick1,
 	input  [6:0] joystick2,
@@ -39,8 +40,10 @@ module hid
 );
 
 wire row9 = (Y == 9);
+wire row8 = (Y == 8);
 wire row6 = (Y == 6);
-assign X = ~(key[Y] | joy1 | joy2 | mouse);
+wire [7:0] vkb_caps_mask = (row8 && vkb_caps_hold) ? 8'b0100_0000 : 8'd0;
+assign X = ~(key[Y] | vkb_caps_mask | joy1 | joy2 | mouse);
 
 //================================= Joysticks ===========================================
 

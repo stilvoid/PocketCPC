@@ -19,6 +19,7 @@ module cpc_machine_pocket (
     input  wire [6:0]  joy1,
     input  wire [6:0]  joy2,
     input  wire [10:0] ps2_key,
+    input  wire        vkb_caps_hold,
 
     input  wire        loader_wr,
     input  wire [15:0] loader_addr,
@@ -154,6 +155,7 @@ Amstrad_motherboard motherboard (
     .joy2(joy2),
     .right_shift_mod(1'b0),
     .keypad_mod(1'b0),
+    .vkb_caps_hold(vkb_caps_hold),
     .ps2_key(ps2_key),
     .ps2_mouse(25'd0),
     .joy1_sel(joy1_sel),
@@ -228,7 +230,11 @@ Amstrad_motherboard motherboard (
 );
 
 always @(posedge clk) begin
-    if (reset) begin
+    // Keep wrapper-local FDC/audio state aligned with the actual CPC machine
+    // reset, not only the outer framework reset. Otherwise soft resets and
+    // some warm boot paths can leave the FDC clock phase, motor latch, or
+    // sampled audio state dirty while the motherboard/u765 were reset.
+    if (machine_reset) begin
         old_io_wr <= 1'b0;
         motor     <= 1'b0;
         u765_div  <= 3'd0;

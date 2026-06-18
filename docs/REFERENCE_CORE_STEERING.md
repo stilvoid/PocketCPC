@@ -52,6 +52,14 @@ at least moved in the right direction. If the result is unverified, unstable,
 or worse than the previous confirmed build, keep iterating in the working tree
 and do not commit.
 
+When a build becomes a confirmed good checkpoint and is committed, also save a
+copy of the exact packaged `bitstream.rbf_r` in a repository location reserved
+for known-good comparison artefacts. Treat those snapshots as hardware
+reference points: they should line up with the commit that produced them so a
+later regression can be compared against a proven core image rather than
+rebuilding from memory. Use `releases/known-good/` for those archived Pocket
+bitstreams.
+
 ## Ownership Boundaries
 
 The MiSTer Amstrad CPC core owns:

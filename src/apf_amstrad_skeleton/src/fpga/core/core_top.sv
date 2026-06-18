@@ -255,7 +255,7 @@ end
 
 always @(posedge clk_74a) begin
     if (!core_reset_n) begin
-        host_reset_stable_n  <= 1'b0;
+        host_reset_stable_n   <= 1'b0;
         host_reset_high_count <= 16'd0;
         host_reset_low_count  <= 16'd0;
     end else if (host_reset_n) begin
@@ -277,8 +277,11 @@ always @(posedge clk_74a) begin
     end
 end
 
+// Keep the ROM/FDC loader side on the same debounced framework-reset contract as
+// the CPC machine itself. Without that, relaunching the core can preserve stale
+// loader/runtime state across runs and produce inconsistent warm-start boots.
 synch_3 cpc_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_stable_n, cpc_reset_n, cpc_clk);
-synch_3 cpc_loader_reset_sync(core_reset_n & cpc_pll_ready_74, cpc_loader_reset_n, cpc_clk);
+synch_3 cpc_loader_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_stable_n, cpc_loader_reset_n, cpc_clk);
 
 // MiSTer runs the CPC from 64 MHz and derives a clean 16 MHz gate-array enable.
 reg [1:0]  cpc_div    = 2'd0;
@@ -340,9 +343,12 @@ wire [6:0]  cpc_joy2;
 wire [7:0]  cpc_audio_l;
 wire [7:0]  cpc_audio_r;
 wire        cpc_vkb_active;
-wire [5:0]  cpc_vkb_index;
+wire [6:0]  cpc_vkb_index;
 wire [1:0]  cpc_vkb_page;
 wire        cpc_vkb_shift;
+wire        cpc_vkb_ctrl;
+wire        cpc_vkb_caps;
+wire        cpc_vkb_caps_pulse;
 
 synch_3 host_reset_sync_cpc(host_reset_stable_n, host_reset_n_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
@@ -363,7 +369,10 @@ cpc_pocket_input cpc_input (
     .vkb_active( cpc_vkb_active ),
     .vkb_index ( cpc_vkb_index ),
     .vkb_page  ( cpc_vkb_page ),
-    .vkb_shift ( cpc_vkb_shift )
+    .vkb_shift ( cpc_vkb_shift ),
+    .vkb_ctrl  ( cpc_vkb_ctrl ),
+    .vkb_caps  ( cpc_vkb_caps ),
+    .vkb_caps_pulse( cpc_vkb_caps_pulse )
 );
 
 cpc_machine_pocket cpc_machine (
@@ -375,6 +384,7 @@ cpc_machine_pocket cpc_machine (
     .joy1            ( cpc_joy1 ),
     .joy2            ( cpc_joy2 ),
     .ps2_key         ( cpc_ps2_key ),
+    .vkb_caps_hold   ( cpc_vkb_caps_pulse ),
     .loader_wr       ( cpc_loader_wr ),
     .loader_addr     ( cpc_loader_addr ),
     .loader_data     ( cpc_loader_data ),
@@ -423,6 +433,7 @@ localparam integer V_FRONT   = 8;
 localparam integer V_SYNC    = 4;
 localparam integer V_BACK    = 10;
 localparam integer V_TOTAL   = V_VISIBLE + V_FRONT + V_SYNC + V_BACK;
+localparam bit DEBUG_FORCE_POCKET_VIDEO = 1'b0;
 
 reg [9:0] h_count = 10'd0;
 reg [8:0] v_count = 9'd0;
@@ -434,13 +445,24 @@ reg       cpc_native_de = 1'b0;
 reg       cpc_native_hs = 1'b0;
 reg       cpc_native_vs = 1'b0;
 reg [23:0] cpc_native_rgb = 24'h000000;
+reg       apf_video_de = 1'b0;
+reg       apf_video_hs = 1'b0;
+reg       apf_video_vs = 1'b0;
+reg [23:0] apf_video_rgb = 24'h000000;
+reg       debug_native_de = 1'b0;
+reg       debug_native_hs = 1'b0;
+reg       debug_native_vs = 1'b0;
+reg [23:0] debug_native_rgb = 24'h000000;
 reg       cpc_hsync_prev = 1'b0;
 reg       cpc_vsync_prev = 1'b0;
 reg [2:0] cpc_hsync_delay = 3'd0;
+reg       debug_hsync_prev = 1'b0;
+reg       debug_vsync_prev = 1'b0;
+reg [2:0] debug_hsync_delay = 3'd0;
 wire [23:0] cpc_overlay_rgb;
 
 always @(posedge cpc_clk) begin
-    if (!cpc_reset_n) begin
+    if (!(DEBUG_FORCE_POCKET_VIDEO ? (core_reset_n & cpc_pll_ready_74) : cpc_reset_n)) begin
         cpc_apf_counter <= 2'd0;
         cpc_apf_ce <= 1'b0;
         cpc_apf_pixel_clk <= 1'b0;
@@ -449,19 +471,23 @@ always @(posedge cpc_clk) begin
         cpc_apf_counter <= cpc_apf_counter + 2'd1;
         cpc_apf_ce <= (cpc_apf_counter == 2'd0);
 
-        if (cpc_apf_counter == 2'd0) cpc_apf_pixel_clk <= 1'b1;
-        if (cpc_apf_counter == 2'd2) cpc_apf_pixel_clk <= 1'b0;
+        // Update the APF-facing video data on cpc_apf_ce first, then raise the
+        // DDR capture clock a quarter-cycle later. This matches the intent of the
+        // ZX Pocket core's dedicated pixel phase more closely and gives the DDIO
+        // path real setup margin instead of relying on same-edge capture.
+        if (cpc_apf_counter == 2'd1) cpc_apf_pixel_clk <= 1'b1;
+        if (cpc_apf_counter == 2'd3) cpc_apf_pixel_clk <= 1'b0;
 
-        if (cpc_apf_counter == 2'd1) cpc_apf_pixel_clk_90 <= 1'b1;
-        if (cpc_apf_counter == 2'd3) cpc_apf_pixel_clk_90 <= 1'b0;
+        if (cpc_apf_counter == 2'd2) cpc_apf_pixel_clk_90 <= 1'b1;
+        if (cpc_apf_counter == 2'd0) cpc_apf_pixel_clk_90 <= 1'b0;
     end
 end
 
 always @(posedge cpc_clk) begin
-    if (!cpc_reset_n) begin
+    if (!(DEBUG_FORCE_POCKET_VIDEO ? (core_reset_n & cpc_pll_ready_74) : cpc_reset_n)) begin
         h_count <= 10'd0;
         v_count <= 9'd0;
-    end else if (cpc_apf_ce && !cpc_rom_loaded) begin
+    end else if (cpc_apf_ce && (DEBUG_FORCE_POCKET_VIDEO || !cpc_rom_loaded)) begin
         if (h_count == H_TOTAL - 1) begin
             h_count <= 10'd0;
 
@@ -510,11 +536,54 @@ always @(posedge cpc_clk) begin
     end
 end
 
+always @(posedge cpc_clk) begin
+    if (!(core_reset_n & cpc_pll_ready_74)) begin
+        debug_native_de <= 1'b0;
+        debug_native_hs <= 1'b0;
+        debug_native_vs <= 1'b0;
+        debug_native_rgb <= 24'h000000;
+        debug_hsync_prev <= 1'b0;
+        debug_vsync_prev <= 1'b0;
+        debug_hsync_delay <= 3'd0;
+    end else if (cpc_apf_ce && DEBUG_FORCE_POCKET_VIDEO) begin
+        debug_native_de <= 1'b0;
+        debug_native_hs <= 1'b0;
+        debug_native_rgb <= 24'h000000;
+
+        if (visible) begin
+            debug_native_de <= 1'b1;
+            debug_native_rgb <= debug_forced_rgb;
+        end
+
+        if (debug_hsync_delay != 3'd0) begin
+            debug_hsync_delay <= debug_hsync_delay - 3'd1;
+        end
+
+        if (debug_hsync_delay == 3'd1) begin
+            debug_native_hs <= 1'b1;
+        end
+
+        if (!debug_hsync_prev && h_sync) begin
+            debug_hsync_delay <= 3'd7;
+        end
+
+        debug_native_vs <= !debug_vsync_prev && v_sync;
+        debug_hsync_prev <= h_sync;
+        debug_vsync_prev <= v_sync;
+    end
+end
+
 wire visible = (h_count < H_VISIBLE) && (v_count < V_VISIBLE);
 wire h_sync  = (h_count >= H_VISIBLE + H_FRONT) &&
                (h_count <  H_VISIBLE + H_FRONT + H_SYNC);
 wire v_sync  = (v_count >= V_VISIBLE + V_FRONT) &&
                (v_count <  V_VISIBLE + V_FRONT + V_SYNC);
+wire [23:0] debug_forced_rgb =
+    !visible ? 24'h000000 :
+    (v_count < 9'd80)  ? ((h_count < 10'd106) ? 24'hff0000 :
+                          (h_count < 10'd212) ? 24'h00ff00 : 24'h0000ff) :
+    (v_count < 9'd160) ? ((h_count[4] ^ v_count[4]) ? 24'hffffff : 24'h000000) :
+                         ((h_count < 10'd160) ? 24'hff00ff : 24'h00ffff);
 
 reg  [23:0] display_rgb;
 
@@ -547,14 +616,44 @@ cpc_virtual_keyboard_overlay cpc_vkb_overlay (
     .selected_index ( cpc_vkb_index ),
     .page           ( cpc_vkb_page ),
     .shift_active   ( cpc_vkb_shift ),
+    .ctrl_active    ( cpc_vkb_ctrl ),
+    .caps_active    ( cpc_vkb_caps ),
     .rgb_out        ( cpc_overlay_rgb )
 );
 
-assign video_rgb          = cpc_rom_loaded ? (cpc_vkb_active ? cpc_overlay_rgb : cpc_native_rgb) : (visible ? display_rgb : 24'h000000);
-assign video_de           = cpc_rom_loaded ? cpc_native_de : visible;
+wire [23:0] apf_video_rgb_next =
+    DEBUG_FORCE_POCKET_VIDEO ? debug_native_rgb :
+    (cpc_rom_loaded ? (cpc_vkb_active ? cpc_overlay_rgb : cpc_native_rgb) :
+                      (visible ? display_rgb : 24'h000000));
+wire apf_video_de_next =
+    DEBUG_FORCE_POCKET_VIDEO ? debug_native_de :
+    (cpc_rom_loaded ? cpc_native_de : visible);
+wire apf_video_hs_next =
+    DEBUG_FORCE_POCKET_VIDEO ? debug_native_hs :
+    (cpc_rom_loaded ? cpc_native_hs : ~h_sync);
+wire apf_video_vs_next =
+    DEBUG_FORCE_POCKET_VIDEO ? debug_native_vs :
+    (cpc_rom_loaded ? cpc_native_vs : ~v_sync);
+
+always @(posedge cpc_clk) begin
+    if (!(DEBUG_FORCE_POCKET_VIDEO ? (core_reset_n & cpc_pll_ready_74) : cpc_reset_n)) begin
+        apf_video_rgb <= 24'h000000;
+        apf_video_de  <= 1'b0;
+        apf_video_hs  <= 1'b0;
+        apf_video_vs  <= 1'b0;
+    end else if (cpc_apf_ce) begin
+        apf_video_rgb <= apf_video_rgb_next;
+        apf_video_de  <= apf_video_de_next;
+        apf_video_hs  <= apf_video_hs_next;
+        apf_video_vs  <= apf_video_vs_next;
+    end
+end
+
+assign video_rgb          = apf_video_rgb;
+assign video_de           = apf_video_de;
 assign video_skip         = 1'b0;
-assign video_hs           = cpc_rom_loaded ? cpc_native_hs : ~h_sync;
-assign video_vs           = cpc_rom_loaded ? cpc_native_vs : ~v_sync;
+assign video_hs           = apf_video_hs;
+assign video_vs           = apf_video_vs;
 assign video_rgb_clock    = cpc_apf_pixel_clk;
 assign video_rgb_clock_90 = cpc_apf_pixel_clk_90;
 

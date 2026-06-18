@@ -13,6 +13,10 @@ hardware behavior already observed unless the immediate goal is to recover the
 Pocket to that known state for comparison or recovery. Apply the same rule to
 commits: only commit after a Pocket-tested improvement has been confirmed, and
 do not commit regressions or merely unverified changes.
+When committing a confirmed good checkpoint, archive the exact packaged
+`bitstream.rbf_r` alongside that checkpoint so known-good hardware images are
+available for direct comparison later. Store those snapshots under
+`releases/known-good/`.
 
 ## Phase 0: Local setup and audit
 
