@@ -438,8 +438,6 @@ wire video_domain_reset_n = core_reset_n & cpc_pll_ready_74;
 
 reg [9:0] h_count = 10'd0;
 reg [8:0] v_count = 9'd0;
-reg [1:0] cpc_apf_counter = 2'd0;
-reg       cpc_apf_ce = 1'b0;
 reg       cpc_apf_pixel_clk = 1'b0;
 reg       cpc_apf_pixel_clk_90 = 1'b0;
 reg       cpc_native_de = 1'b0;
@@ -461,26 +459,22 @@ reg       debug_hsync_prev = 1'b0;
 reg       debug_vsync_prev = 1'b0;
 reg [2:0] debug_hsync_delay = 3'd0;
 wire [23:0] cpc_overlay_rgb;
+wire       cpc_apf_ce = cpc_ce_16;
 
 always @(posedge cpc_clk) begin
-    if (!video_domain_reset_n) begin
-        cpc_apf_counter <= 2'd0;
-        cpc_apf_ce <= 1'b0;
+    if (!cpc_reset_n) begin
         cpc_apf_pixel_clk <= 1'b0;
         cpc_apf_pixel_clk_90 <= 1'b0;
     end else begin
-        cpc_apf_counter <= cpc_apf_counter + 2'd1;
-        cpc_apf_ce <= (cpc_apf_counter == 2'd0);
+        // Keep the APF-side pixel enable and capture clocks on the same phase
+        // generator that drives the imported CPC machine. A separate free-
+        // running divider can sample the first visible line on the wrong
+        // quarter-cycle after reset or warm starts.
+        if (cpc_div == 2'd1) cpc_apf_pixel_clk <= 1'b1;
+        if (cpc_div == 2'd3) cpc_apf_pixel_clk <= 1'b0;
 
-        // Update the APF-facing video data on cpc_apf_ce first, then raise the
-        // DDR capture clock a quarter-cycle later. This matches the intent of the
-        // ZX Pocket core's dedicated pixel phase more closely and gives the DDIO
-        // path real setup margin instead of relying on same-edge capture.
-        if (cpc_apf_counter == 2'd1) cpc_apf_pixel_clk <= 1'b1;
-        if (cpc_apf_counter == 2'd3) cpc_apf_pixel_clk <= 1'b0;
-
-        if (cpc_apf_counter == 2'd2) cpc_apf_pixel_clk_90 <= 1'b1;
-        if (cpc_apf_counter == 2'd0) cpc_apf_pixel_clk_90 <= 1'b0;
+        if (cpc_div == 2'd2) cpc_apf_pixel_clk_90 <= 1'b1;
+        if (cpc_div == 2'd0) cpc_apf_pixel_clk_90 <= 1'b0;
     end
 end
 
