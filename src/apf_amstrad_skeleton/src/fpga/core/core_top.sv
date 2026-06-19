@@ -434,6 +434,7 @@ localparam integer V_SYNC    = 4;
 localparam integer V_BACK    = 10;
 localparam integer V_TOTAL   = V_VISIBLE + V_FRONT + V_SYNC + V_BACK;
 localparam bit DEBUG_FORCE_POCKET_VIDEO = 1'b0;
+wire video_domain_reset_n = core_reset_n & cpc_pll_ready_74;
 
 reg [9:0] h_count = 10'd0;
 reg [8:0] v_count = 9'd0;
@@ -462,7 +463,7 @@ reg [2:0] debug_hsync_delay = 3'd0;
 wire [23:0] cpc_overlay_rgb;
 
 always @(posedge cpc_clk) begin
-    if (!(DEBUG_FORCE_POCKET_VIDEO ? (core_reset_n & cpc_pll_ready_74) : cpc_reset_n)) begin
+    if (!video_domain_reset_n) begin
         cpc_apf_counter <= 2'd0;
         cpc_apf_ce <= 1'b0;
         cpc_apf_pixel_clk <= 1'b0;
@@ -484,7 +485,7 @@ always @(posedge cpc_clk) begin
 end
 
 always @(posedge cpc_clk) begin
-    if (!(DEBUG_FORCE_POCKET_VIDEO ? (core_reset_n & cpc_pll_ready_74) : cpc_reset_n)) begin
+    if (!video_domain_reset_n) begin
         h_count <= 10'd0;
         v_count <= 9'd0;
     end else if (cpc_apf_ce && (DEBUG_FORCE_POCKET_VIDEO || !cpc_rom_loaded)) begin
@@ -537,7 +538,7 @@ always @(posedge cpc_clk) begin
 end
 
 always @(posedge cpc_clk) begin
-    if (!(core_reset_n & cpc_pll_ready_74)) begin
+    if (!video_domain_reset_n) begin
         debug_native_de <= 1'b0;
         debug_native_hs <= 1'b0;
         debug_native_vs <= 1'b0;
@@ -636,7 +637,7 @@ wire apf_video_vs_next =
     (cpc_rom_loaded ? cpc_native_vs : ~v_sync);
 
 always @(posedge cpc_clk) begin
-    if (!(DEBUG_FORCE_POCKET_VIDEO ? (core_reset_n & cpc_pll_ready_74) : cpc_reset_n)) begin
+    if (!video_domain_reset_n) begin
         apf_video_rgb <= 24'h000000;
         apf_video_de  <= 1'b0;
         apf_video_hs  <= 1'b0;
@@ -753,6 +754,9 @@ wire [2:0]  target_dataslot_err;
 wire        target_dataslot_ack_s;
 wire        target_dataslot_done_s;
 wire [2:0]  target_dataslot_err_s;
+wire        target_dataslot_ack_cpc;
+wire        target_dataslot_done_cpc;
+wire [2:0]  target_dataslot_err_cpc;
 wire        loader_cmd_request_flag;
 wire        loader_cmd_write_strobe;
 wire        fdc_cmd_request_flag;
@@ -801,6 +805,9 @@ end
 synch_3 fdc_dataslot_toggle_sync(fdc_dataslot_toggle_74, fdc_dataslot_toggle_cpc, cpc_clk);
 synch_3 #(.WIDTH(16)) fdc_dataslot_id_sync(fdc_dataslot_id_74, fdc_dataslot_id_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) fdc_dataslot_size_sync(fdc_dataslot_size_74, fdc_dataslot_size_cpc, cpc_clk);
+synch_3 target_dataslot_ack_sync(target_dataslot_ack, target_dataslot_ack_cpc, cpc_clk);
+synch_3 target_dataslot_done_sync(target_dataslot_done, target_dataslot_done_cpc, cpc_clk);
+synch_3 #(.WIDTH(3)) target_dataslot_err_sync(target_dataslot_err, target_dataslot_err_cpc, cpc_clk);
 
 always @(posedge cpc_clk) begin
     if (!cpc_loader_reset_n) begin
@@ -852,9 +859,10 @@ pocket_dataslot_loader #(
     .target_dataslot_length      ( rom_target_dataslot_length ),
     .cmd_request_flag            ( loader_cmd_request_flag ),
     .cmd_write_strobe            ( loader_cmd_write_strobe ),
-    .target_dataslot_ack         ( fdc_client_selected ? 1'b0 : target_dataslot_ack_s ),
-    .target_dataslot_done        ( fdc_client_selected ? 1'b0 : target_dataslot_done_s ),
-    .target_dataslot_err         ( fdc_client_selected ? 3'd0 : target_dataslot_err_s ),
+    .cmd_ack_flag                ( fdc_client_selected ? 1'b0 : bridge_cmd_ack_flag ),
+    .target_dataslot_ack         ( fdc_client_selected ? 1'b0 : target_dataslot_ack_cpc ),
+    .target_dataslot_done        ( fdc_client_selected ? 1'b0 : target_dataslot_done_cpc ),
+    .target_dataslot_err         ( fdc_client_selected ? 3'd0 : target_dataslot_err_cpc ),
     .loader_wr                   ( cpc_loader_wr ),
     .loader_addr                 ( cpc_loader_addr ),
     .loader_data                 ( cpc_loader_data ),
@@ -895,9 +903,9 @@ pocket_fdc_dataslot fdc_loader (
     .cmd_request_flag            ( fdc_cmd_request_flag ),
     .cmd_write_strobe            ( fdc_cmd_write_strobe ),
     .cmd_ack_flag                ( fdc_client_selected ? bridge_cmd_ack_flag : 1'b0 ),
-    .target_dataslot_ack         ( fdc_client_selected ? target_dataslot_ack_s : 1'b0 ),
-    .target_dataslot_done        ( fdc_client_selected ? target_dataslot_done_s : 1'b0 ),
-    .target_dataslot_err         ( fdc_client_selected ? target_dataslot_err_s : 3'd0 ),
+    .target_dataslot_ack         ( fdc_client_selected ? target_dataslot_ack_cpc : 1'b0 ),
+    .target_dataslot_done        ( fdc_client_selected ? target_dataslot_done_cpc : 1'b0 ),
+    .target_dataslot_err         ( fdc_client_selected ? target_dataslot_err_cpc : 3'd0 ),
     .target_active               ( fdc_target_active )
 );
 

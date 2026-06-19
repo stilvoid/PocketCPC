@@ -70,7 +70,6 @@ localparam [3:0] ST_WAIT_RELEASE = 4'd12;
 
 reg [3:0] state = ST_IDLE;
 reg [8:0] stream_index = 9'd0;
-reg [3:0] request_hold = 4'd0;
 reg [6:0] bram_rd_addr = 7'd0;
 reg [3:0] write_ack_count = 4'd0;
 reg [23:0] settle_count = 24'd0;
@@ -105,7 +104,6 @@ always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         state                      <= ST_IDLE;
         stream_index               <= 9'd0;
-        request_hold               <= 4'd0;
         bram_rd_addr               <= 7'd0;
         write_ack_count            <= 4'd0;
         settle_count               <= 24'd0;
@@ -196,7 +194,6 @@ always @(posedge clk or negedge reset_n) begin
                 target_dataslot_read <= 1'b1;
                 cmd_request_flag     <= 1'b1;
                 cmd_write_strobe     <= 1'b1;
-                request_hold         <= 4'd0;
                 state                <= ST_REQUEST_HOLD;
             end
 
@@ -204,28 +201,22 @@ always @(posedge clk or negedge reset_n) begin
                 target_dataslot_read <= 1'b1;
                 cmd_request_flag     <= 1'b1;
                 cmd_write_strobe     <= 1'b1;
-                request_hold         <= request_hold + 4'd1;
-                if (&request_hold) begin
+                if (cmd_ack_flag) begin
                     cmd_write_strobe <= 1'b0;
                     cmd_request_flag <= 1'b0;
-                    request_hold     <= 4'd0;
                     state            <= ST_WAIT_ACK;
                 end
             end
 
             ST_WAIT_ACK: begin
-                cmd_request_flag <= ~cmd_request_flag;
                 if (target_dataslot_ack) begin
                     target_dataslot_read <= 1'b0;
-                    cmd_request_flag     <= 1'b0;
                     state                <= ST_WAIT_DONE;
                 end
             end
 
             ST_WAIT_DONE: begin
-                cmd_request_flag <= ~cmd_request_flag;
                 if (target_dataslot_done) begin
-                    cmd_request_flag <= 1'b0;
                     if (target_dataslot_err != 3'd0) begin
                         state <= ST_DROP_ACK;
                     end else begin

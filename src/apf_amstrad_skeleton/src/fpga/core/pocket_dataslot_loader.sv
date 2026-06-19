@@ -33,6 +33,7 @@ module pocket_dataslot_loader #(
     output reg [31:0]  target_dataslot_length,
     output reg         cmd_request_flag,
     output reg         cmd_write_strobe,
+    input  wire        cmd_ack_flag,
     input  wire        target_dataslot_ack,
     input  wire        target_dataslot_done,
     input  wire [2:0]  target_dataslot_err,
@@ -69,7 +70,6 @@ reg [31:0] file_offset = 32'd0;
 reg [31:0] remaining = TOTAL_BYTES;
 reg [10:0] chunk_len = 11'd0;
 reg [10:0] stream_index = 11'd0;
-reg [3:0]  request_hold = 4'd0;
 reg [7:0]  bram_rd_addr = 8'd0;
 wire [31:0] bram_rd_data;
 
@@ -102,7 +102,6 @@ always @(posedge clk or negedge reset_n) begin
         remaining                   <= TOTAL_BYTES;
         chunk_len                   <= 11'd0;
         stream_index                <= 11'd0;
-        request_hold                <= 4'd0;
         bram_rd_addr                <= 8'd0;
         datatable_addr              <= 10'd0;
         target_dataslot_read        <= 1'b0;
@@ -160,7 +159,6 @@ always @(posedge clk or negedge reset_n) begin
                 target_dataslot_read       <= 1'b1;
                 cmd_request_flag           <= 1'b1;
                 cmd_write_strobe           <= 1'b1;
-                request_hold               <= 4'd0;
                 state                      <= ST_REQUEST_HOLD;
             end
 
@@ -169,30 +167,24 @@ always @(posedge clk or negedge reset_n) begin
                 target_dataslot_read <= 1'b1;
                 cmd_request_flag     <= 1'b1;
                 cmd_write_strobe     <= 1'b1;
-                request_hold         <= request_hold + 4'd1;
-                if (&request_hold) begin
+                if (cmd_ack_flag) begin
                     cmd_write_strobe <= 1'b0;
                     cmd_request_flag <= 1'b0;
-                    request_hold     <= 4'd0;
                     state            <= ST_WAIT_ACK;
                 end
             end
 
             ST_WAIT_ACK: begin
                 debug_state_r    <= ST_WAIT_ACK;
-                cmd_request_flag <= ~cmd_request_flag;
                 if (target_dataslot_ack) begin
                     target_dataslot_read <= 1'b0;
-                    cmd_request_flag     <= 1'b0;
                     state                <= ST_WAIT_DONE;
                 end
             end
 
             ST_WAIT_DONE: begin
                 debug_state_r    <= ST_WAIT_DONE;
-                cmd_request_flag <= ~cmd_request_flag;
                 if (target_dataslot_done) begin
-                    cmd_request_flag <= 1'b0;
                     if (target_dataslot_err != 3'd0) begin
                         state <= ST_ERROR;
                     end else begin
