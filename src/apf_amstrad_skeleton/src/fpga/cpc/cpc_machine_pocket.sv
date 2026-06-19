@@ -26,6 +26,25 @@ module cpc_machine_pocket (
     input  wire [7:0]  loader_data,
     input  wire        loader_done,
     input  wire        loader_error,
+    input  wire        snapshot_busy_reset,
+    input  wire        snapshot_mem_wr,
+    input  wire [16:0] snapshot_mem_addr,
+    input  wire [7:0]  snapshot_mem_data,
+    input  wire        sna_load,
+    input  wire [211:0] sna_cpu_dir,
+    input  wire [4:0]  sna_crtc_addr,
+    input  wire [143:0] sna_crtc_regs,
+    input  wire [4:0]  sna_ga_inksel,
+    input  wire [135:0] sna_ga_palette,
+    input  wire [7:0]  sna_ga_config,
+    input  wire [7:0]  sna_ram_config,
+    input  wire [7:0]  sna_rom_select,
+    input  wire [7:0]  sna_ppi_a,
+    input  wire [7:0]  sna_ppi_b,
+    input  wire [7:0]  sna_ppi_c,
+    input  wire [7:0]  sna_ppi_control,
+    input  wire [3:0]  sna_psg_addr,
+    input  wire [127:0] sna_psg_regs,
     output wire        rom_loaded,
     output wire [31:0] sd_lba,
     output wire [1:0]  sd_rd,
@@ -112,7 +131,7 @@ reg  [7:0]  audio_right_r = 8'd0;
 // On this wrapper, 4'b1111 selects the bundled ROM's "Amstrad" string.
 localparam [3:0] CPC_DISTRIBUTOR_AMSTRAD = 4'b1111;
 
-wire machine_reset = reset | key_reset | !rom_loaded;
+wire machine_reset = reset | key_reset | !rom_loaded | snapshot_busy_reset;
 
 assign cpu_addr_debug = cpu_addr;
 assign mem_rd_debug   = mem_rd;
@@ -142,6 +161,9 @@ cpc_ram_rom memory (
     .loader_data  ( loader_data ),
     .loader_done  ( loader_done ),
     .loader_error ( loader_error ),
+    .snapshot_mem_wr   ( snapshot_mem_wr ),
+    .snapshot_mem_addr ( snapshot_mem_addr ),
+    .snapshot_mem_data ( snapshot_mem_data ),
     .rom_loaded   ( rom_loaded ),
     .rom_map      ( rom_map )
 );
@@ -169,21 +191,21 @@ Amstrad_motherboard motherboard (
     .sync_filter(1'b1),
     .no_wait(1'b0),
 
-    .sna_load(1'b0),
-    .sna_cpu_dir(212'd0),
-    .sna_crtc_addr(5'd0),
-    .sna_crtc_regs(144'd0),
-    .sna_ga_inksel(5'd0),
-    .sna_ga_palette(136'd0),
-    .sna_ga_config(8'd0),
-    .sna_ram_config(8'd0),
-    .sna_rom_select(8'd0),
-    .sna_ppi_a(8'd0),
-    .sna_ppi_b(8'd0),
-    .sna_ppi_c(8'd0),
-    .sna_ppi_control(8'd0),
-    .sna_psg_addr(4'd0),
-    .sna_psg_regs(128'd0),
+    .sna_load(sna_load),
+    .sna_cpu_dir(sna_cpu_dir),
+    .sna_crtc_addr(sna_crtc_addr),
+    .sna_crtc_regs(sna_crtc_regs),
+    .sna_ga_inksel(sna_ga_inksel),
+    .sna_ga_palette(sna_ga_palette),
+    .sna_ga_config(sna_ga_config),
+    .sna_ram_config(sna_ram_config),
+    .sna_rom_select(sna_rom_select),
+    .sna_ppi_a(sna_ppi_a),
+    .sna_ppi_b(sna_ppi_b),
+    .sna_ppi_c(sna_ppi_c),
+    .sna_ppi_control(sna_ppi_control),
+    .sna_psg_addr(sna_psg_addr),
+    .sna_psg_regs(sna_psg_regs),
 
     .tape_in(1'b0),
     .tape_out(tape_out),

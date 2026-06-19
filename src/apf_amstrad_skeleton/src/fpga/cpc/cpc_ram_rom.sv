@@ -31,6 +31,9 @@ module cpc_ram_rom (
     input  wire [7:0]  loader_data,
     input  wire        loader_done,
     input  wire        loader_error,
+    input  wire        snapshot_mem_wr,
+    input  wire [16:0] snapshot_mem_addr,
+    input  wire [7:0]  snapshot_mem_data,
     output reg         rom_loaded,
     output reg  [255:0] rom_map
 );
@@ -55,15 +58,19 @@ wire [7:0] ram_vram_odd_q;
 wire [7:0] rom_os_q;
 wire [7:0] rom_basic_q;
 wire [7:0] rom_amsdos_q;
+wire [15:0] ram_port_addr = snapshot_mem_wr ? snapshot_mem_addr[16:1] : ram_word_addr;
+wire [7:0]  ram_port_data = snapshot_mem_wr ? snapshot_mem_data : cpu_dout;
+wire        ram_port_even_wr = snapshot_mem_wr ? !snapshot_mem_addr[0] : (mem_wr && ram_selected && !ram_addr[0]);
+wire        ram_port_odd_wr  = snapshot_mem_wr ? snapshot_mem_addr[0]  : (mem_wr && ram_selected && ram_addr[0]);
 
 dpram #(
     .DATAWIDTH(8),
     .ADDRWIDTH(16)
 ) cpc_ram_even (
     .clock     ( clk ),
-    .address_a ( ram_word_addr ),
-    .data_a    ( cpu_dout ),
-    .wren_a    ( mem_wr && ram_selected && !ram_addr[0] ),
+    .address_a ( ram_port_addr ),
+    .data_a    ( ram_port_data ),
+    .wren_a    ( ram_port_even_wr ),
     .q_a       ( ram_cpu_even_q ),
     .address_b ( vram_word_addr ),
     .data_b    ( 8'd0 ),
@@ -76,9 +83,9 @@ dpram #(
     .ADDRWIDTH(16)
 ) cpc_ram_odd (
     .clock     ( clk ),
-    .address_a ( ram_word_addr ),
-    .data_a    ( cpu_dout ),
-    .wren_a    ( mem_wr && ram_selected && ram_addr[0] ),
+    .address_a ( ram_port_addr ),
+    .data_a    ( ram_port_data ),
+    .wren_a    ( ram_port_odd_wr ),
     .q_a       ( ram_cpu_odd_q ),
     .address_b ( vram_word_addr ),
     .data_b    ( 8'd0 ),

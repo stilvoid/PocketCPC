@@ -29,6 +29,7 @@ REQUIRED_FILES = [
     FPGA / "core" / "mf_audio_pll_0002.qip",
     FPGA / "core" / "pocket_dataslot_loader.sv",
     FPGA / "core" / "pocket_fdc_dataslot.sv",
+    FPGA / "core" / "pocket_sna_dataslot.sv",
     FPGA / "core" / "pocket_bridge_regs.sv",
     FPGA / "core" / "sound_i2s.sv",
     FPGA / "core" / "sync_fifo.sv",
@@ -84,6 +85,7 @@ ALLOWED_QSF_SOURCES = {
     "core/core_bridge_cmd.v",
     "core/pocket_dataslot_loader.sv",
     "core/pocket_fdc_dataslot.sv",
+    "core/pocket_sna_dataslot.sv",
     "core/pocket_bridge_regs.sv",
 }
 

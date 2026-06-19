@@ -38,6 +38,15 @@
         "parameters": 9,
         "filename": "",
         "extensions": ["cdt"]
+      },
+      {
+        "name": "Snapshot",
+        "id": "4",
+        "required": false,
+        "deferload": true,
+        "parameters": 9,
+        "filename": "",
+        "extensions": ["sna"]
       }
     ]
   }
