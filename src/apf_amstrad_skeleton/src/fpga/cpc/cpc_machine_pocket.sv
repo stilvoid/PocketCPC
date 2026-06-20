@@ -1,10 +1,11 @@
 //
 // Pocket-side smoke wrapper for the imported MiSTer Amstrad CPC motherboard.
 //
-// This is not a complete CPC integration yet. It keeps MiSTer-only transport
-// outside the machine boundary, feeds fixed CPC 6128-style defaults, and maps
-// a Pocket-loaded boot.rom bundle into the ROM pages expected by the imported
-// MiSTer motherboard.
+// This keeps MiSTer-only transport outside the machine boundary and maps a
+// Pocket-loaded boot.rom bundle into the ROM pages expected by the imported
+// MiSTer motherboard. Snapshot loads can temporarily switch the machine into
+// 64K-model behaviour so 464/664-targeted SNA files see the ROM/RAM shape they
+// expect.
 //
 
 `default_nettype none
@@ -128,6 +129,7 @@ reg  [2:0]  u765_div = 3'd0;
 reg         ce_u765 = 1'b0;
 reg  [7:0]  audio_left_r = 8'd0;
 reg  [7:0]  audio_right_r = 8'd0;
+reg  [1:0]  machine_model = 2'd0;
 
 // CPC6128 OS reads PPI port B bits 1..3 as active-low distributor jumpers.
 // On this wrapper, 4'b1111 selects the bundled ROM's "Amstrad" string.
@@ -168,7 +170,7 @@ cpc_ram_rom memory (
     .loader_data  ( loader_data ),
     .loader_done  ( loader_done ),
     .loader_error ( loader_error ),
-    .model        ( 2'd0 ),
+    .model        ( machine_model ),
     .snapshot_mem_wr   ( snapshot_mem_wr ),
     .snapshot_mem_addr ( snapshot_mem_addr ),
     .snapshot_mem_data ( snapshot_mem_data ),
@@ -236,7 +238,7 @@ Amstrad_motherboard motherboard (
     .vram_addr(vram_addr),
 
     .rom_map(rom_map),
-    .ram64k(1'b0),
+    .ram64k(machine_model != 2'd0),
     .mem_addr(mem_addr),
     .mem_rd(mem_rd),
     .mem_wr(mem_wr),
@@ -260,6 +262,12 @@ Amstrad_motherboard motherboard (
 );
 
 always @(posedge clk) begin
+    if (reset || rom_reset) begin
+        machine_model <= 2'd0;
+    end else if (sna_load) begin
+        machine_model <= sna_model;
+    end
+
     // Keep wrapper-local FDC/audio state aligned with the actual CPC machine
     // reset, not only the outer framework reset. Otherwise soft resets and
     // some warm boot paths can leave the FDC clock phase, motor latch, or
