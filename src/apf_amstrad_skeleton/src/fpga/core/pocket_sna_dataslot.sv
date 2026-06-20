@@ -53,7 +53,8 @@ module pocket_sna_dataslot (
     output reg  [7:0]   sna_ppi_c,
     output reg  [7:0]   sna_ppi_control,
     output reg  [3:0]   sna_psg_addr,
-    output reg  [127:0] sna_psg_regs
+    output reg  [127:0] sna_psg_regs,
+    output reg  [1:0]   sna_model
 );
 
 localparam [15:0] SLOT_SNAPSHOT     = 16'h0004;
@@ -163,6 +164,7 @@ always @(posedge clk or negedge reset_n) begin
         sna_psg_addr               <= 4'd0;
         sna_psg_regs               <= 128'd0;
         sna_mem_size               <= 16'd64;
+        sna_model                  <= 2'd0;
     end else begin
         snapshot_mem_wr  <= 1'b0;
         cmd_write_strobe <= 1'b0;
@@ -200,6 +202,7 @@ always @(posedge clk or negedge reset_n) begin
                     sna_psg_addr      <= 4'd0;
                     sna_psg_regs      <= 128'd0;
                     sna_mem_size      <= 16'd64;
+                    sna_model         <= 2'd0;
                     state             <= ST_REQUEST;
                 end
             end
@@ -301,7 +304,23 @@ always @(posedge clk or negedge reset_n) begin
                         8'h59: sna_ppi_control      <= current_byte;
                         8'h5a: sna_psg_addr         <= current_byte[3:0];
                         8'h6b: sna_mem_size[7:0]    <= current_byte;
-                        8'h6c: sna_mem_size[15:8]   <= current_byte;
+                        8'h6c: begin
+                            sna_mem_size[15:8] <= current_byte;
+                            if ({current_byte, sna_mem_size[7:0]} > 16'd64) sna_model <= 2'd0;
+                            else if (sna_cpu_dir[79:64] == 16'h0038) sna_model <= 2'd2;
+                        end
+                        8'h6d: begin
+                            if (sna_mem_size > 16'd64) begin
+                                sna_model <= 2'd0;
+                            end else begin
+                                case (current_byte)
+                                    8'd0: sna_model <= 2'd2; // CPC464
+                                    8'd1: sna_model <= 2'd1; // CPC664
+                                    8'd2, 8'd4, 8'd6: sna_model <= 2'd0; // 6128/Plus/GX
+                                    default: begin end
+                                endcase
+                            end
+                        end
                         default: begin end
                     endcase
 

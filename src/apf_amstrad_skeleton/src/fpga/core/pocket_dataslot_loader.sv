@@ -39,7 +39,7 @@ module pocket_dataslot_loader #(
     input  wire [2:0]  target_dataslot_err,
 
     output reg         loader_wr,
-    output reg [15:0]  loader_addr,
+    output reg [17:0]  loader_addr,
     output reg [7:0]   loader_data,
     output reg         loader_done,
     output reg         loader_error,
@@ -112,7 +112,7 @@ always @(posedge clk or negedge reset_n) begin
         cmd_request_flag            <= 1'b0;
         cmd_write_strobe            <= 1'b0;
         loader_wr                   <= 1'b0;
-        loader_addr                 <= 16'd0;
+        loader_addr                 <= 18'd0;
         loader_data                 <= 8'd0;
         loader_done                 <= 1'b0;
         loader_error                <= 1'b0;
@@ -209,7 +209,7 @@ always @(posedge clk or negedge reset_n) begin
             ST_STREAM_DATA: begin
                 debug_state_r <= ST_STREAM_DATA;
                 loader_wr   <= 1'b1;
-                loader_addr <= file_offset[15:0] + {5'd0, stream_index};
+                loader_addr <= file_offset[17:0] + {7'd0, stream_index};
 
                 case (stream_index[1:0])
                     2'b11:   loader_data <= bram_rd_data[31:24];

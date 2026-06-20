@@ -30,6 +30,7 @@ REQUIRED_FILES = [
     FPGA / "core" / "pocket_dataslot_loader.sv",
     FPGA / "core" / "pocket_fdc_dataslot.sv",
     FPGA / "core" / "pocket_sna_dataslot.sv",
+    FPGA / "core" / "pocket_tape_dataslot.sv",
     FPGA / "core" / "pocket_bridge_regs.sv",
     FPGA / "core" / "sound_i2s.sv",
     FPGA / "core" / "sync_fifo.sv",
@@ -44,6 +45,7 @@ REQUIRED_FILES = [
     FPGA / "cpc" / "u765" / "u765.sv",
     FPGA / "cpc" / "crt_filter.v",
     FPGA / "cpc" / "hid.sv",
+    FPGA / "cpc" / "tzxplayer.vhd",
     FPGA / "cpc" / "T80" / "T80.qip",
     FPGA / "cpc" / "GA40010" / "ga40010.qip",
     SKELETON / "Platforms" / "amstrad.json",
@@ -71,6 +73,7 @@ ALLOWED_QSF_SOURCES = {
     "cpc/u765/u765.sv",
     "cpc/crt_filter.v",
     "cpc/hid.sv",
+    "cpc/tzxplayer.vhd",
     "core/dpram.v",
     "core/cpc_pll.v",
     "core/cpc_pll_0002.v",
@@ -86,6 +89,7 @@ ALLOWED_QSF_SOURCES = {
     "core/pocket_dataslot_loader.sv",
     "core/pocket_fdc_dataslot.sv",
     "core/pocket_sna_dataslot.sv",
+    "core/pocket_tape_dataslot.sv",
     "core/pocket_bridge_regs.sv",
 }
 

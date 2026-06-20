@@ -22,7 +22,7 @@ module cpc_machine_pocket (
     input  wire        vkb_caps_hold,
 
     input  wire        loader_wr,
-    input  wire [15:0] loader_addr,
+    input  wire [17:0] loader_addr,
     input  wire [7:0]  loader_data,
     input  wire        loader_done,
     input  wire        loader_error,
@@ -45,6 +45,7 @@ module cpc_machine_pocket (
     input  wire [7:0]  sna_ppi_control,
     input  wire [3:0]  sna_psg_addr,
     input  wire [127:0] sna_psg_regs,
+    input  wire [1:0]  sna_model,
     output wire        rom_loaded,
     output wire [31:0] sd_lba,
     output wire [1:0]  sd_rd,
@@ -58,6 +59,9 @@ module cpc_machine_pocket (
     input  wire [31:0] img_size,
     input  wire        img_wp,
     input  wire [1:0]  fdc_ready,
+    input  wire        tape_in,
+    output wire        tape_out,
+    output wire        tape_motor,
 
     output wire [23:0] rgb,
     output wire        hsync,
@@ -83,8 +87,6 @@ wire        joy2_sel;
 wire        key_nmi;
 wire        key_reset;
 wire [9:0]  fn_keys;
-wire        tape_out;
-wire        tape_motor;
 wire [7:0]  audio_l;
 wire [7:0]  audio_r;
 wire [1:0]  mode;
@@ -144,6 +146,11 @@ assign audio_right    = audio_right_r;
 
 wire [15:0] vram_din;
 wire [255:0] rom_map;
+wire [8:0]  tape_mix = {3'd0, tape_out, 1'b0, (tape_in & tape_motor), 3'd0};
+wire [8:0]  audio_mix_l = {1'b0, audio_l} + tape_mix;
+wire [8:0]  audio_mix_r = {1'b0, audio_r} + tape_mix;
+wire [7:0]  audio_mix_l_sat = audio_mix_l[8] ? 8'hff : audio_mix_l[7:0];
+wire [7:0]  audio_mix_r_sat = audio_mix_r[8] ? 8'hff : audio_mix_r[7:0];
 
 cpc_ram_rom memory (
     .clk          ( clk ),
@@ -161,6 +168,7 @@ cpc_ram_rom memory (
     .loader_data  ( loader_data ),
     .loader_done  ( loader_done ),
     .loader_error ( loader_error ),
+    .model        ( 2'd0 ),
     .snapshot_mem_wr   ( snapshot_mem_wr ),
     .snapshot_mem_addr ( snapshot_mem_addr ),
     .snapshot_mem_data ( snapshot_mem_data ),
@@ -207,7 +215,7 @@ Amstrad_motherboard motherboard (
     .sna_psg_addr(sna_psg_addr),
     .sna_psg_regs(sna_psg_regs),
 
-    .tape_in(1'b0),
+    .tape_in(tape_in),
     .tape_out(tape_out),
     .tape_motor(tape_motor),
 
@@ -273,8 +281,8 @@ always @(posedge clk) begin
         ce_u765  <= !u765_div[2:0];
 
         if (ce_16) begin
-            audio_left_r  <= audio_l;
-            audio_right_r <= audio_r;
+            audio_left_r  <= audio_mix_l_sat;
+            audio_right_r <= audio_mix_r_sat;
         end
     end
 end

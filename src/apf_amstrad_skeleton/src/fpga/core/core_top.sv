@@ -313,7 +313,7 @@ wire [15:0] cpc_cpu_addr_debug;
 wire        cpc_mem_rd_debug;
 wire        cpc_mem_wr_debug;
 wire        cpc_loader_wr;
-wire [15:0] cpc_loader_addr;
+wire [17:0] cpc_loader_addr;
 wire [7:0]  cpc_loader_data;
 wire        cpc_loader_done;
 wire        cpc_loader_error;
@@ -336,6 +336,7 @@ wire [7:0]  cpc_sna_ppi_c;
 wire [7:0]  cpc_sna_ppi_control;
 wire [3:0]  cpc_sna_psg_addr;
 wire [127:0] cpc_sna_psg_regs;
+wire [1:0]  cpc_sna_model;
 wire [3:0]  cpc_loader_state;
 wire [31:0] cpc_loader_offset;
 wire        cpc_rom_loaded;
@@ -351,6 +352,10 @@ wire [1:0]  cpc_img_mounted;
 wire [31:0] cpc_img_size;
 wire        cpc_img_wp;
 wire [1:0]  cpc_drive_ready;
+wire        cpc_tape_in;
+wire        cpc_tape_out;
+wire        cpc_tape_motor;
+wire        cpc_tape_running;
 wire        host_reset_n_cpc;
 wire [31:0] cont1_key_cpc;
 wire [31:0] cont3_key_cpc;
@@ -428,6 +433,7 @@ cpc_machine_pocket cpc_machine (
     .sna_ppi_control ( cpc_sna_ppi_control ),
     .sna_psg_addr    ( cpc_sna_psg_addr ),
     .sna_psg_regs    ( cpc_sna_psg_regs ),
+    .sna_model       ( cpc_sna_model ),
     .rom_loaded      ( cpc_rom_loaded ),
     .sd_lba          ( cpc_sd_lba ),
     .sd_rd           ( cpc_sd_rd ),
@@ -441,6 +447,9 @@ cpc_machine_pocket cpc_machine (
     .img_size        ( cpc_img_size ),
     .img_wp          ( cpc_img_wp ),
     .fdc_ready       ( cpc_drive_ready ),
+    .tape_in         ( cpc_tape_in ),
+    .tape_out        ( cpc_tape_out ),
+    .tape_motor      ( cpc_tape_motor ),
     .rgb             ( cpc_rgb ),
     .hsync           ( cpc_hsync ),
     .vsync           ( cpc_vsync ),
@@ -775,6 +784,11 @@ wire [15:0] fdc_target_dataslot_id;
 wire [31:0] fdc_target_dataslot_slotoffset;
 wire [31:0] fdc_target_dataslot_bridgeaddr;
 wire [31:0] fdc_target_dataslot_length;
+wire        tape_target_dataslot_read;
+wire [15:0] tape_target_dataslot_id;
+wire [31:0] tape_target_dataslot_slotoffset;
+wire [31:0] tape_target_dataslot_bridgeaddr;
+wire [31:0] tape_target_dataslot_length;
 wire        target_dataslot_read;
 wire [15:0] target_dataslot_id;
 wire [31:0] target_dataslot_slotoffset;
@@ -795,8 +809,11 @@ wire        sna_cmd_request_flag;
 wire        sna_cmd_write_strobe;
 wire        fdc_cmd_request_flag;
 wire        fdc_cmd_write_strobe;
+wire        tape_cmd_request_flag;
+wire        tape_cmd_write_strobe;
 wire        bridge_cmd_ack_flag;
 wire        fdc_target_active;
+wire        tape_target_active;
 wire        sna_target_dataslot_read;
 wire [15:0] sna_target_dataslot_id;
 wire [31:0] sna_target_dataslot_slotoffset;
@@ -814,11 +831,15 @@ wire [15:0] bridge_target_status;
 wire [3:0]  bridge_target_io;
 wire        dataslot_runtime_enable = cpc_loader_done & cpc_rom_loaded;
 wire        sna_client_selected = dataslot_runtime_enable & sna_target_active;
-wire        fdc_client_selected = dataslot_runtime_enable & !sna_target_active & fdc_target_active;
+wire        tape_client_selected = dataslot_runtime_enable & !sna_target_active & tape_target_active;
+wire        fdc_client_selected = dataslot_runtime_enable & !sna_target_active & !tape_target_active & fdc_target_active;
 
 reg         fdc_dataslot_toggle_74 = 1'b0;
 reg  [15:0] fdc_dataslot_id_74 = 16'd0;
 reg  [31:0] fdc_dataslot_size_74 = 32'd0;
+reg         tape_dataslot_toggle_74 = 1'b0;
+reg  [15:0] tape_dataslot_id_74 = 16'd0;
+reg  [31:0] tape_dataslot_size_74 = 32'd0;
 reg         sna_dataslot_toggle_74 = 1'b0;
 reg  [15:0] sna_dataslot_id_74 = 16'd0;
 reg  [31:0] sna_dataslot_size_74 = 32'd0;
@@ -827,6 +848,11 @@ wire [15:0] fdc_dataslot_id_cpc;
 wire [31:0] fdc_dataslot_size_cpc;
 reg         fdc_dataslot_toggle_cpc_d = 1'b0;
 wire        fdc_dataslot_update_cpc = fdc_dataslot_toggle_cpc ^ fdc_dataslot_toggle_cpc_d;
+wire        tape_dataslot_toggle_cpc;
+wire [15:0] tape_dataslot_id_cpc;
+wire [31:0] tape_dataslot_size_cpc;
+reg         tape_dataslot_toggle_cpc_d = 1'b0;
+wire        tape_dataslot_update_cpc = tape_dataslot_toggle_cpc ^ tape_dataslot_toggle_cpc_d;
 wire        sna_dataslot_toggle_cpc;
 wire [15:0] sna_dataslot_id_cpc;
 wire [31:0] sna_dataslot_size_cpc;
@@ -834,18 +860,23 @@ reg         sna_dataslot_toggle_cpc_d = 1'b0;
 wire        sna_dataslot_update_cpc = sna_dataslot_toggle_cpc ^ sna_dataslot_toggle_cpc_d;
 
 assign target_dataslot_read       = sna_client_selected ? sna_target_dataslot_read :
+                                    tape_client_selected ? tape_target_dataslot_read :
                                     fdc_client_selected ? fdc_target_dataslot_read :
                                     rom_target_dataslot_read;
 assign target_dataslot_id         = sna_client_selected ? sna_target_dataslot_id :
+                                    tape_client_selected ? tape_target_dataslot_id :
                                     fdc_client_selected ? fdc_target_dataslot_id :
                                     rom_target_dataslot_id;
 assign target_dataslot_slotoffset = sna_client_selected ? sna_target_dataslot_slotoffset :
+                                    tape_client_selected ? tape_target_dataslot_slotoffset :
                                     fdc_client_selected ? fdc_target_dataslot_slotoffset :
                                     rom_target_dataslot_slotoffset;
 assign target_dataslot_bridgeaddr = sna_client_selected ? sna_target_dataslot_bridgeaddr :
+                                    tape_client_selected ? tape_target_dataslot_bridgeaddr :
                                     fdc_client_selected ? fdc_target_dataslot_bridgeaddr :
                                     rom_target_dataslot_bridgeaddr;
 assign target_dataslot_length     = sna_client_selected ? sna_target_dataslot_length :
+                                    tape_client_selected ? tape_target_dataslot_length :
                                     fdc_client_selected ? fdc_target_dataslot_length :
                                     rom_target_dataslot_length;
 
@@ -854,6 +885,9 @@ always @(posedge clk_74a) begin
         fdc_dataslot_toggle_74 <= 1'b0;
         fdc_dataslot_id_74     <= 16'd0;
         fdc_dataslot_size_74   <= 32'd0;
+        tape_dataslot_toggle_74 <= 1'b0;
+        tape_dataslot_id_74     <= 16'd0;
+        tape_dataslot_size_74   <= 32'd0;
         sna_dataslot_toggle_74 <= 1'b0;
         sna_dataslot_id_74     <= 16'd0;
         sna_dataslot_size_74   <= 32'd0;
@@ -862,6 +896,11 @@ always @(posedge clk_74a) begin
             fdc_dataslot_toggle_74 <= ~fdc_dataslot_toggle_74;
             fdc_dataslot_id_74     <= dataslot_update_id;
             fdc_dataslot_size_74   <= dataslot_update_size;
+        end
+        if (dataslot_update_id == 16'h0003) begin
+            tape_dataslot_toggle_74 <= ~tape_dataslot_toggle_74;
+            tape_dataslot_id_74     <= dataslot_update_id;
+            tape_dataslot_size_74   <= dataslot_update_size;
         end
         if (dataslot_update_id == 16'h0004) begin
             sna_dataslot_toggle_74 <= ~sna_dataslot_toggle_74;
@@ -874,6 +913,9 @@ end
 synch_3 fdc_dataslot_toggle_sync(fdc_dataslot_toggle_74, fdc_dataslot_toggle_cpc, cpc_clk);
 synch_3 #(.WIDTH(16)) fdc_dataslot_id_sync(fdc_dataslot_id_74, fdc_dataslot_id_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) fdc_dataslot_size_sync(fdc_dataslot_size_74, fdc_dataslot_size_cpc, cpc_clk);
+synch_3 tape_dataslot_toggle_sync(tape_dataslot_toggle_74, tape_dataslot_toggle_cpc, cpc_clk);
+synch_3 #(.WIDTH(16)) tape_dataslot_id_sync(tape_dataslot_id_74, tape_dataslot_id_cpc, cpc_clk);
+synch_3 #(.WIDTH(32)) tape_dataslot_size_sync(tape_dataslot_size_74, tape_dataslot_size_cpc, cpc_clk);
 synch_3 sna_dataslot_toggle_sync(sna_dataslot_toggle_74, sna_dataslot_toggle_cpc, cpc_clk);
 synch_3 #(.WIDTH(16)) sna_dataslot_id_sync(sna_dataslot_id_74, sna_dataslot_id_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) sna_dataslot_size_sync(sna_dataslot_size_74, sna_dataslot_size_cpc, cpc_clk);
@@ -884,9 +926,11 @@ synch_3 #(.WIDTH(3)) target_dataslot_err_sync(target_dataslot_err, target_datasl
 always @(posedge cpc_clk) begin
     if (!cpc_loader_reset_n) begin
         fdc_dataslot_toggle_cpc_d <= 1'b0;
+        tape_dataslot_toggle_cpc_d <= 1'b0;
         sna_dataslot_toggle_cpc_d <= 1'b0;
     end else begin
         fdc_dataslot_toggle_cpc_d <= fdc_dataslot_toggle_cpc;
+        tape_dataslot_toggle_cpc_d <= tape_dataslot_toggle_cpc;
         sna_dataslot_toggle_cpc_d <= sna_dataslot_toggle_cpc;
     end
 end
@@ -915,7 +959,7 @@ pocket_bridge_regs regs (
 
 pocket_dataslot_loader #(
     .SLOT_ID     ( 16'h0200 ),
-    .TOTAL_BYTES ( 32'h0000_c000 )
+    .TOTAL_BYTES ( 32'h0002_8000 )
 ) rom_loader (
     .clk                         ( cpc_clk ),
     .bridge_clk                  ( clk_74a ),
@@ -933,10 +977,10 @@ pocket_dataslot_loader #(
     .target_dataslot_length      ( rom_target_dataslot_length ),
     .cmd_request_flag            ( loader_cmd_request_flag ),
     .cmd_write_strobe            ( loader_cmd_write_strobe ),
-    .cmd_ack_flag                ( (sna_client_selected || fdc_client_selected) ? 1'b0 : bridge_cmd_ack_flag ),
-    .target_dataslot_ack         ( (sna_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_ack_cpc ),
-    .target_dataslot_done        ( (sna_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_done_cpc ),
-    .target_dataslot_err         ( (sna_client_selected || fdc_client_selected) ? 3'd0 : target_dataslot_err_cpc ),
+    .cmd_ack_flag                ( (sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : bridge_cmd_ack_flag ),
+    .target_dataslot_ack         ( (sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_ack_cpc ),
+    .target_dataslot_done        ( (sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_done_cpc ),
+    .target_dataslot_err         ( (sna_client_selected || tape_client_selected || fdc_client_selected) ? 3'd0 : target_dataslot_err_cpc ),
     .loader_wr                   ( cpc_loader_wr ),
     .loader_addr                 ( cpc_loader_addr ),
     .loader_data                 ( cpc_loader_data ),
@@ -987,7 +1031,37 @@ pocket_sna_dataslot sna_loader (
     .sna_ppi_c                   ( cpc_sna_ppi_c ),
     .sna_ppi_control             ( cpc_sna_ppi_control ),
     .sna_psg_addr                ( cpc_sna_psg_addr ),
-    .sna_psg_regs                ( cpc_sna_psg_regs )
+    .sna_psg_regs                ( cpc_sna_psg_regs ),
+    .sna_model                   ( cpc_sna_model )
+);
+
+pocket_tape_dataslot tape_loader (
+    .clk                         ( cpc_clk ),
+    .bridge_clk                  ( clk_74a ),
+    .reset_n                     ( cpc_loader_reset_n ),
+    .enable                      ( dataslot_runtime_enable ),
+    .restart                     ( !cpc_reset_n ),
+    .bridge_addr                 ( bridge_addr ),
+    .bridge_wr                   ( bridge_wr ),
+    .bridge_wr_data              ( bridge_wr_data ),
+    .dataslot_update             ( tape_dataslot_update_cpc ),
+    .dataslot_update_id          ( tape_dataslot_id_cpc ),
+    .dataslot_update_size        ( tape_dataslot_size_cpc ),
+    .tape_motor                  ( cpc_tape_motor ),
+    .tape_in                     ( cpc_tape_in ),
+    .tape_running                ( cpc_tape_running ),
+    .target_dataslot_read        ( tape_target_dataslot_read ),
+    .target_dataslot_id          ( tape_target_dataslot_id ),
+    .target_dataslot_slotoffset  ( tape_target_dataslot_slotoffset ),
+    .target_dataslot_bridgeaddr  ( tape_target_dataslot_bridgeaddr ),
+    .target_dataslot_length      ( tape_target_dataslot_length ),
+    .cmd_request_flag            ( tape_cmd_request_flag ),
+    .cmd_write_strobe            ( tape_cmd_write_strobe ),
+    .cmd_ack_flag                ( tape_client_selected ? bridge_cmd_ack_flag : 1'b0 ),
+    .target_dataslot_ack         ( tape_client_selected ? target_dataslot_ack_cpc : 1'b0 ),
+    .target_dataslot_done        ( tape_client_selected ? target_dataslot_done_cpc : 1'b0 ),
+    .target_dataslot_err         ( tape_client_selected ? target_dataslot_err_cpc : 3'd0 ),
+    .target_active               ( tape_target_active )
 );
 
 pocket_fdc_dataslot fdc_loader (
@@ -1106,9 +1180,11 @@ core_bridge_cmd cmd (
 
     .i_clk_sync                  ( cpc_clk ),
     .i_write_strobe              ( sna_client_selected ? sna_cmd_write_strobe :
+                                   tape_client_selected ? tape_cmd_write_strobe :
                                    fdc_client_selected ? fdc_cmd_write_strobe :
                                    loader_cmd_write_strobe ),
     .i_request_flag              ( sna_client_selected ? sna_cmd_request_flag :
+                                   tape_client_selected ? tape_cmd_request_flag :
                                    fdc_client_selected ? fdc_cmd_request_flag :
                                    loader_cmd_request_flag ),
 	    .o_ack_flag                  ( bridge_cmd_ack_flag ),
