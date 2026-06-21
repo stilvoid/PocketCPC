@@ -30,6 +30,8 @@ module cpc_pocket_input (
 localparam [7:0] PS2_LSHIFT = 8'h12;
 localparam [7:0] PS2_CTRL   = 8'h14;
 localparam [22:0] VKB_CAPS_PULSE_CYCLES = 23'd7_999_999;
+localparam [20:0] MACRO_PRESS_DELAY_CYCLES   = 21'd1_279_999; // ~20 ms @ 64 MHz
+localparam [20:0] MACRO_RELEASE_DELAY_CYCLES = 21'd255_999;   // ~4 ms  @ 64 MHz
 
 wire [15:0] buttons = cont1_key[15:0];
 wire [15:0] changed = buttons ^ buttons_prev;
@@ -54,6 +56,12 @@ reg [7:0]  dock_keyboard_mods_sample = 8'd0;
 reg [47:0] dock_keyboard_codes_sample = 48'd0;
 reg [1:0]  dock_keyboard_phase = 2'd3;
 reg [2:0]  dock_keyboard_index = 3'd0;
+reg         macro_active = 1'b0;
+reg  [2:0]  macro_id = 3'd0;
+reg  [5:0]  macro_step = 6'd0;
+reg         macro_release_shift = 1'b0;
+reg         macro_release_ctrl = 1'b0;
+reg  [20:0] macro_delay = 21'd0;
 
 // Reuse the MiSTer CPC joystick bit ordering exactly as exposed by joydb.sv:
 // {fire3, fire2, fire1, up, down, left, right}. hid.sv performs its own final
@@ -357,6 +365,145 @@ function [9:0] map_vkb_button_to_ps2;
     end
 endfunction
 
+function vkb_is_macro_key;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_is_macro_key = (page == 2'd3) && (key_index <= 7'd4);
+    end
+endfunction
+
+function [2:0] vkb_macro_id;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        if ((page == 2'd3) && (key_index <= 7'd4)) vkb_macro_id = key_index[2:0] + 3'd1;
+        else vkb_macro_id = 3'd0;
+    end
+endfunction
+
+function [5:0] macro_body_len;
+    input [2:0] id;
+    begin
+        case (id)
+            3'd1: macro_body_len = 6'd14; // |TAPE<ret>
+            3'd2: macro_body_len = 6'd14; // |DISC<ret>
+            3'd3: macro_body_len = 6'd8;  // CAT<ret>
+            3'd4: macro_body_len = 6'd12; // RUN"<ret>
+            3'd5: macro_body_len = 6'd24; // RUN"DISC"<ret>
+            default: macro_body_len = 6'd0;
+        endcase
+    end
+endfunction
+
+function [10:0] macro_body_event;
+    input [2:0] id;
+    input [5:0] step;
+    begin
+        macro_body_event = 11'd0;
+        case (id)
+            3'd1: begin
+                case (step)
+                    6'd0:  macro_body_event = {1'b1, 1'b1, 1'b0, PS2_LSHIFT};
+                    6'd1:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h54};
+                    6'd2:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h54};
+                    6'd3:  macro_body_event = {1'b1, 1'b0, 1'b0, PS2_LSHIFT};
+                    6'd4:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h2C};
+                    6'd5:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h2C};
+                    6'd6:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h1C};
+                    6'd7:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h1C};
+                    6'd8:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h4D};
+                    6'd9:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h4D};
+                    6'd10: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h24};
+                    6'd11: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h24};
+                    6'd12: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h5A};
+                    6'd13: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h5A};
+                    default: macro_body_event = 11'd0;
+                endcase
+            end
+            3'd2: begin
+                case (step)
+                    6'd0:  macro_body_event = {1'b1, 1'b1, 1'b0, PS2_LSHIFT};
+                    6'd1:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h54};
+                    6'd2:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h54};
+                    6'd3:  macro_body_event = {1'b1, 1'b0, 1'b0, PS2_LSHIFT};
+                    6'd4:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h23};
+                    6'd5:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h23};
+                    6'd6:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h43};
+                    6'd7:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h43};
+                    6'd8:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h1B};
+                    6'd9:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h1B};
+                    6'd10: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h21};
+                    6'd11: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h21};
+                    6'd12: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h5A};
+                    6'd13: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h5A};
+                    default: macro_body_event = 11'd0;
+                endcase
+            end
+            3'd3: begin
+                case (step)
+                    6'd0: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h21};
+                    6'd1: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h21};
+                    6'd2: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h1C};
+                    6'd3: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h1C};
+                    6'd4: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h2C};
+                    6'd5: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h2C};
+                    6'd6: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h5A};
+                    6'd7: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h5A};
+                    default: macro_body_event = 11'd0;
+                endcase
+            end
+            3'd4: begin
+                case (step)
+                    6'd0: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h2D};
+                    6'd1: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h2D};
+                    6'd2: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h3C};
+                    6'd3: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h3C};
+                    6'd4: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h31};
+                    6'd5: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h31};
+                    6'd6: macro_body_event = {1'b1, 1'b1, 1'b0, PS2_LSHIFT};
+                    6'd7: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h1E};
+                    6'd8: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h1E};
+                    6'd9: macro_body_event = {1'b1, 1'b0, 1'b0, PS2_LSHIFT};
+                    6'd10: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h5A};
+                    6'd11: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h5A};
+                    default: macro_body_event = 11'd0;
+                endcase
+            end
+            3'd5: begin
+                case (step)
+                    6'd0:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h2D};
+                    6'd1:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h2D};
+                    6'd2:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h3C};
+                    6'd3:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h3C};
+                    6'd4:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h31};
+                    6'd5:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h31};
+                    6'd6:  macro_body_event = {1'b1, 1'b1, 1'b0, PS2_LSHIFT};
+                    6'd7:  macro_body_event = {1'b1, 1'b1, 1'b0, 8'h1E};
+                    6'd8:  macro_body_event = {1'b1, 1'b0, 1'b0, 8'h1E};
+                    6'd9:  macro_body_event = {1'b1, 1'b0, 1'b0, PS2_LSHIFT};
+                    6'd10: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h23};
+                    6'd11: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h23};
+                    6'd12: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h43};
+                    6'd13: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h43};
+                    6'd14: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h1B};
+                    6'd15: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h1B};
+                    6'd16: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h21};
+                    6'd17: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h21};
+                    6'd18: macro_body_event = {1'b1, 1'b1, 1'b0, PS2_LSHIFT};
+                    6'd19: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h1E};
+                    6'd20: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h1E};
+                    6'd21: macro_body_event = {1'b1, 1'b0, 1'b0, PS2_LSHIFT};
+                    6'd22: macro_body_event = {1'b1, 1'b1, 1'b0, 8'h5A};
+                    6'd23: macro_body_event = {1'b1, 1'b0, 1'b0, 8'h5A};
+                    default: macro_body_event = 11'd0;
+                endcase
+            end
+            default: macro_body_event = 11'd0;
+        endcase
+    end
+endfunction
+
 function vkb_is_shift_key;
     input [6:0] key_index;
     input [1:0] page;
@@ -401,6 +548,8 @@ function [6:0] vkb_clamp_index;
                 7'd72, 7'd73, 7'd74: vkb_clamp_index = 7'd71;
                 default: vkb_clamp_index = key_index;
             endcase
+        end else if (key_index > vkb_page_last_index(page)) begin
+            vkb_clamp_index = vkb_page_last_index(page);
         end
     end
 endfunction
@@ -408,14 +557,24 @@ endfunction
 function [6:0] vkb_page_last_index;
     input [1:0] page;
     begin
-        vkb_page_last_index = (page == 2'd0) ? 7'd74 : 7'd59;
+        case (page)
+            2'd0: vkb_page_last_index = 7'd74;
+            2'd1: vkb_page_last_index = 7'd49;
+            2'd2: vkb_page_last_index = 7'd21;
+            default: vkb_page_last_index = 7'd4;
+        endcase
     end
 endfunction
 
 function [6:0] vkb_page_last_movable_row;
     input [1:0] page;
     begin
-        vkb_page_last_movable_row = (page == 2'd0) ? 7'd59 : 7'd44;
+        case (page)
+            2'd0: vkb_page_last_movable_row = 7'd59;
+            2'd1: vkb_page_last_movable_row = 7'd34;
+            2'd2: vkb_page_last_movable_row = 7'd6;
+            default: vkb_page_last_movable_row = 7'd0;
+        endcase
     end
 endfunction
 
@@ -430,12 +589,20 @@ wire [7:0] dock_report_code = dock_keyboard_code_at(dock_keyboard_codes_sample, 
 wire [9:0] dock_modifier_ps2 = map_dock_modifier_to_ps2(dock_keyboard_index);
 wire [9:0] dock_active_ps2 = map_usb_hid_to_ps2(dock_active_code);
 wire [9:0] dock_report_ps2 = map_usb_hid_to_ps2(dock_report_code);
+wire [1:0] macro_prelude_len = {1'b0, macro_release_ctrl} + {1'b0, macro_release_shift};
+wire [5:0] macro_total_len = macro_body_len(macro_id) + {4'd0, macro_prelude_len};
+reg  [10:0] macro_ps2_event;
+reg         macro_ps2_valid;
+reg  [5:0]  macro_body_step;
 
 always @(*) begin
-    next_pending    = pending | changed;
+    next_pending    = macro_active ? 16'd0 : (pending | changed);
     selected_button = 4'd0;
     selected_ps2    = 10'd0;
     selected_valid  = 1'b0;
+    macro_ps2_event = 11'd0;
+    macro_ps2_valid = 1'b0;
+    macro_body_step = 6'd0;
 
     // Select toggles the on-screen keyboard locally, and Start is consumed by
     // the existing core reset path in core_top.
@@ -452,8 +619,25 @@ always @(*) begin
         next_pending[13]  = 1'b0;
         if (vkb_is_shift_key(vkb_index, vkb_page) ||
             vkb_is_ctrl_key(vkb_index, vkb_page) ||
-            vkb_is_caps_key(vkb_index, vkb_page)) begin
+            vkb_is_caps_key(vkb_index, vkb_page) ||
+            vkb_is_macro_key(vkb_index, vkb_page)) begin
             next_pending[4] = 1'b0;
+        end
+    end
+
+    if (macro_active && (macro_step < macro_total_len)) begin
+        if (macro_release_ctrl && (macro_step == 6'd0)) begin
+            macro_ps2_event = {1'b1, 1'b0, 1'b0, PS2_CTRL};
+            macro_ps2_valid = 1'b1;
+        end else if (macro_release_shift &&
+                     (((!macro_release_ctrl) && (macro_step == 6'd0)) ||
+                      (macro_release_ctrl && (macro_step == 6'd1)))) begin
+            macro_ps2_event = {1'b1, 1'b0, 1'b0, PS2_LSHIFT};
+            macro_ps2_valid = 1'b1;
+        end else begin
+            macro_body_step = macro_step - {4'd0, macro_prelude_len};
+            macro_ps2_event = macro_body_event(macro_id, macro_body_step);
+            macro_ps2_valid = macro_ps2_event[10];
         end
     end
 
@@ -492,6 +676,12 @@ always @(posedge clk) begin
         dock_keyboard_codes_sample <= 48'd0;
         dock_keyboard_phase <= 2'd3;
         dock_keyboard_index <= 3'd0;
+        macro_active <= 1'b0;
+        macro_id <= 3'd0;
+        macro_step <= 6'd0;
+        macro_release_shift <= 1'b0;
+        macro_release_ctrl <= 1'b0;
+        macro_delay <= 21'd0;
     end else begin
         buttons_prev <= buttons;
         pending      <= next_pending;
@@ -508,13 +698,18 @@ always @(posedge clk) begin
             if (pressed[14]) begin
                 vkb_active <= ~vkb_active;
                 pending    <= 16'd0;
+                macro_active <= 1'b0;
+                macro_step <= 6'd0;
+                macro_release_shift <= 1'b0;
+                macro_release_ctrl <= 1'b0;
+                macro_delay <= 21'd0;
                 if (vkb_active && vkb_shift) begin
                     vkb_shift <= 1'b0;
                     ps2_key <= {~ps2_key[10], 1'b0, 1'b0, PS2_LSHIFT};
                 end
             end
 
-            if (vkb_active) begin
+            if (vkb_active && !macro_active) begin
                 if (pressed[8]) begin
                     vkb_shift <= ~vkb_shift;
                     ps2_key <= {~ps2_key[10], !vkb_shift, 1'b0, PS2_LSHIFT};
@@ -534,15 +729,27 @@ always @(posedge clk) begin
                         vkb_caps_pulse_timer <= VKB_CAPS_PULSE_CYCLES;
                     end
                 end
+                if (pressed[4] && vkb_is_macro_key(vkb_index, vkb_page) && !macro_active) begin
+                    macro_active <= 1'b1;
+                    macro_id <= vkb_macro_id(vkb_index, vkb_page);
+                    macro_step <= 6'd0;
+                    macro_release_shift <= vkb_shift;
+                    macro_release_ctrl <= vkb_ctrl;
+                    macro_delay <= 21'd0;
+                    pending <= 16'd0;
+                    if (vkb_shift) vkb_shift <= 1'b0;
+                    if (vkb_ctrl) vkb_ctrl <= 1'b0;
+                end
                 if (pressed[9]) begin
-                    if (vkb_page == 2'd2) vkb_page <= 2'd0;
+                    if (vkb_page == 2'd3) vkb_page <= 2'd0;
                     else vkb_page <= vkb_page + 2'd1;
+                    vkb_index <= 7'd0;
                 end
 
                 if (pressed[0] && (vkb_index >= 7'd15)) vkb_index <= vkb_clamp_index(vkb_index - 7'd15, vkb_page);
                 if (pressed[1] && (vkb_index <= vkb_page_last_movable_row(vkb_page))) vkb_index <= vkb_clamp_index(vkb_index + 7'd15, vkb_page);
                 if (pressed[2]) begin
-                    if (vkb_index == 7'd0) vkb_index <= 7'd14;
+                    if (vkb_index == 7'd0) vkb_index <= vkb_page_last_index(vkb_page);
                     else if (vkb_index == 7'd15) vkb_index <= vkb_clamp_index(7'd29, vkb_page);
                     else if (vkb_index == 7'd30) vkb_index <= vkb_clamp_index(7'd44, vkb_page);
                     else if (vkb_index == 7'd45) vkb_index <= vkb_clamp_index(7'd59, vkb_page);
@@ -550,7 +757,7 @@ always @(posedge clk) begin
                     else vkb_index <= vkb_clamp_index(vkb_index - 6'd1, vkb_page);
                 end
                 if (pressed[3]) begin
-                    if (vkb_index == 7'd14) vkb_index <= 7'd0;
+                    if (vkb_index == vkb_page_last_index(vkb_page)) vkb_index <= 7'd0;
                     else if ((vkb_page == 2'd0) && (vkb_index == 7'd28)) vkb_index <= 7'd15;
                     else if ((vkb_page == 2'd0) && (vkb_index == 7'd43)) vkb_index <= 7'd30;
                     else if ((vkb_page == 2'd0) && (vkb_index == 7'd45)) vkb_index <= 7'd47;
@@ -566,7 +773,26 @@ always @(posedge clk) begin
                 end
             end
 
-            if (selected_valid) begin
+            if (macro_active && (macro_delay != 21'd0)) begin
+                macro_delay <= macro_delay - 21'd1;
+            end else if (macro_active && macro_ps2_valid) begin
+                ps2_key <= {~ps2_key[10], macro_ps2_event[9], macro_ps2_event[8], macro_ps2_event[7:0]};
+                macro_step <= macro_step + 6'd1;
+                if (macro_ps2_event[9]) macro_delay <= MACRO_PRESS_DELAY_CYCLES;
+                else macro_delay <= MACRO_RELEASE_DELAY_CYCLES;
+                if (macro_step + 6'd1 >= macro_total_len) begin
+                    macro_active <= 1'b0;
+                    macro_release_shift <= 1'b0;
+                    macro_release_ctrl <= 1'b0;
+                    macro_delay <= 21'd0;
+                end
+            end else if (macro_active) begin
+                macro_active <= 1'b0;
+                macro_step <= 6'd0;
+                macro_release_shift <= 1'b0;
+                macro_release_ctrl <= 1'b0;
+                macro_delay <= 21'd0;
+            end else if (selected_valid) begin
                 pending[selected_button] <= 1'b0;
                 if (vkb_active && selected_button == 4'd4 && buttons[4]) begin
                     vkb_a_ps2 <= selected_ps2[8:0];

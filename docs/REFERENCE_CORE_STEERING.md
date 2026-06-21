@@ -132,6 +132,9 @@ innovation:
   compositing.
 - Keep CPC key matrix behavior mapped from MiSTer CPC/PPI expectations, but
   keep the Pocket presentation/control-plane pattern structurally close to ZX.
+- Keep the virtual keyboard strictly for CPC input. Core-level controls such as
+  zoom, scaler modes, or other display options belong in Pocket core menu
+  metadata and bridge-backed config registers, not on VKB pages.
 - If an HDL-only overlay remains in use temporarily, keep it pipelined and
   ROM/RAM-backed. Do not grow a single-cycle combinational glyph renderer.
 

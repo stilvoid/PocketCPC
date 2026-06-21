@@ -15,7 +15,6 @@ module cpc_virtual_keyboard_overlay (
     input  wire        shift_active,
     input  wire        ctrl_active,
     input  wire        caps_active,
-
     output reg  [23:0] rgb_out
 );
 
@@ -184,11 +183,11 @@ wire       caps_cell = ((page == 2'd0) && (key_idx == 7'd30)) ||
                        ((page == 2'd2) && (key_idx == 6'd2));
 wire       border = (local_x_ext == 7'd0) || (local_x_ext == (cell_width - 7'd1)) ||
                     (local_y_ext == 6'd0) || (local_y_ext == (cell_height - 6'd1));
-wire [1:0] glyph_page = (shift_active && (page == 2'd0)) ? 2'd3 : page;
-wire [1:0] label_size = label_len(key_idx, glyph_page);
-wire [7:0] label_char0 = label_char(key_idx, glyph_page, 2'd0);
-wire [7:0] label_char1 = label_char(key_idx, glyph_page, 2'd1);
-wire [7:0] label_char2 = label_char(key_idx, glyph_page, 2'd2);
+wire       shift_label_mode = shift_active && (page == 2'd0);
+wire [1:0] label_size = label_len(key_idx, page);
+wire [7:0] label_char0 = label_char(key_idx, page, shift_label_mode, 2'd0);
+wire [7:0] label_char1 = label_char(key_idx, page, shift_label_mode, 2'd1);
+wire [7:0] label_char2 = label_char(key_idx, page, shift_label_mode, 2'd2);
 wire [9:0] glyph_start_x =
     (cell_width == 10'd280) ? ((label_size == 2'd3) ? 10'd123 : (label_size == 2'd2) ? 10'd129 : 10'd135) :
     (cell_width == 10'd160) ? ((label_size == 2'd3) ? 10'd63  : (label_size == 2'd2) ? 10'd69  : 10'd75)  :
@@ -220,7 +219,8 @@ wire [4:0] glyph_bits2 = glyph_row_bits(label_char2, glyph_row);
 wire       glyph_on = (glyph_region0 && glyph_bits0[3'd4 - glyph_col0]) ||
                       (glyph_region1 && glyph_bits1[3'd4 - glyph_col1]) ||
                       (glyph_region2 && glyph_bits2[3'd4 - glyph_col2]);
-wire       modifier_latched = (shift_active && shift_cell) || (ctrl_active && ctrl_cell) || (caps_active && caps_cell);
+wire       modifier_latched = (shift_active && shift_cell) || (ctrl_active && ctrl_cell) ||
+                              (caps_active && caps_cell);
 wire [23:0] key_fill = modifier_latched ? 24'h604800 : 24'h202020;
 wire [23:0] key_border = modifier_latched ? 24'hffd000 : 24'h606060;
 
@@ -251,7 +251,7 @@ function [1:0] label_len;
     begin
         label_len = 2'd1;
         case (key_page)
-            2'd0, 2'd3: begin
+            2'd0: begin
                 case (key_index)
                     7'd0, 7'd13, 7'd14, 7'd15, 7'd28, 7'd30, 7'd43,
                     7'd45, 7'd58, 7'd60, 7'd62, 7'd64, 7'd71: label_len = 2'd3;
@@ -274,6 +274,12 @@ function [1:0] label_len;
                     default: label_len = 2'd1;
                 endcase
             end
+            2'd3: begin
+                case (key_index)
+                    6'd0, 6'd1, 6'd2, 6'd3, 6'd4: label_len = 2'd3;
+                    default: label_len = 2'd1;
+                endcase
+            end
             default: label_len = 2'd1;
         endcase
     end
@@ -282,11 +288,12 @@ endfunction
 function [7:0] label_char;
     input [6:0] key_index;
     input [1:0] key_page;
+    input       shift_main_page;
     input [1:0] pos;
     begin
         label_char = 8'h20;
         case (key_page)
-            2'd0, 2'd3: begin
+            2'd0: begin
                 case (key_index)
                     7'd0:  case (pos) 2'd0: label_char = "E"; 2'd1: label_char = "S"; 2'd2: label_char = "C"; default: label_char = 8'h20; endcase
                     7'd13: case (pos) 2'd0: label_char = "C"; 2'd1: label_char = "L"; 2'd2: label_char = "R"; default: label_char = 8'h20; endcase
@@ -301,9 +308,9 @@ function [7:0] label_char;
                     7'd71: case (pos) 2'd0: label_char = "E"; 2'd1: label_char = "N"; 2'd2: label_char = "T"; default: label_char = 8'h20; endcase
                     default: if (pos == 2'd0) begin
                         if (key_is_alpha(key_index)) begin
-                            label_char = key_index_to_char(key_index, (caps_active ^ shift_active) ? 2'd3 : 2'd0);
+                            label_char = key_index_to_char(key_index, (caps_active ^ shift_main_page) ? 2'd3 : 2'd0);
                         end else begin
-                            label_char = key_index_to_char(key_index, key_page);
+                            label_char = key_index_to_char(key_index, shift_main_page ? 2'd3 : 2'd0);
                         end
                     end
                 endcase
@@ -331,7 +338,7 @@ function [7:0] label_char;
                     default: if (pos == 2'd0) label_char = key_index_to_char(key_index, key_page);
                 endcase
             end
-            default: begin
+            2'd2: begin
                 case (key_index)
                     6'd0:  case (pos) 2'd0: label_char = "E"; 2'd1: label_char = "S"; 2'd2: label_char = "C"; default: label_char = 8'h20; endcase
                     6'd1:  case (pos) 2'd0: label_char = "T"; 2'd1: label_char = "A"; 2'd2: label_char = "B"; default: label_char = 8'h20; endcase
@@ -345,6 +352,19 @@ function [7:0] label_char;
                     6'd10: case (pos) 2'd0: label_char = "C"; 2'd1: label_char = "L"; 2'd2: label_char = "R"; default: label_char = 8'h20; endcase
                     default: if (pos == 2'd0) label_char = key_index_to_char(key_index, key_page);
                 endcase
+            end
+            2'd3: begin
+                case (key_index)
+                    6'd0:  case (pos) 2'd0: label_char = "T"; 2'd1: label_char = "A"; 2'd2: label_char = "P"; default: label_char = 8'h20; endcase
+                    6'd1:  case (pos) 2'd0: label_char = "D"; 2'd1: label_char = "S"; 2'd2: label_char = "C"; default: label_char = 8'h20; endcase
+                    6'd2:  case (pos) 2'd0: label_char = "C"; 2'd1: label_char = "A"; 2'd2: label_char = "T"; default: label_char = 8'h20; endcase
+                    6'd3:  case (pos) 2'd0: label_char = "R"; 2'd1: label_char = "U"; 2'd2: label_char = "N"; default: label_char = 8'h20; endcase
+                    6'd4:  case (pos) 2'd0: label_char = "R"; 2'd1: label_char = "D"; 2'd2: label_char = "S"; default: label_char = 8'h20; endcase
+                    default: label_char = 8'h20;
+                endcase
+            end
+            default: begin
+                label_char = 8'h20;
             end
         endcase
     end
