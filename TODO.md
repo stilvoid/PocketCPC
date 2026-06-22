@@ -5,7 +5,8 @@ importance.
 
 ## Current Focus
 
-- [ ] Playfield zoom via Pocket OSD without regressing boot or video stability
+- [x] Playfield zoom via Pocket OSD without regressing boot or video stability
+- [ ] Nudge zoomed playfield a few pixels so it is properly centred
 
 ## Quick Wins
 
@@ -19,9 +20,10 @@ importance.
   - Crop away most of the border/overscan area for games that do not use it.
   - Keep normal full-border mode available.
   - Implement as a Pocket core menu option, not as a virtual-keyboard key.
-  - Current status: previous attempt regressed video output and was removed.
-    Re-implement using the ZX Pocket display/control pattern rather than a
-    CPC-specific ad hoc crop path.
+  - Current status: confirmed working on hardware using the imported CPC CRTC
+    playfield timing rather than an ad hoc crop window. Snapshot load, disk
+    load, and in-game zoom all work. Remaining polish: the zoomed image is a
+    few pixels off-centre, and VKB currently drops back to unzoomed mode.
 
 3. Custom CPC key <-> Pocket button mappings
    - Needed for games that expect keyboard controls instead of joystick input.

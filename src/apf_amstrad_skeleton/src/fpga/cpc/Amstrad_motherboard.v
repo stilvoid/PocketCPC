@@ -72,6 +72,9 @@ module Amstrad_motherboard
 	output        vblank,
 	output        hsync,
 	output        vsync,
+	output        crtc_hsync,
+	output        crtc_vsync,
+	output        crtc_de_o,
 	output        field,
 
 	input  [15:0] vram_din,
@@ -227,6 +230,9 @@ assign hsync = sync_filter ? hsync_filtered : hsync_ga;
 assign vsync = sync_filter ? vsync_filtered : vsync_ga;
 assign hblank = sync_filter ? hblank_filtered : crtc_hs;
 assign vblank = sync_filter ? vblank_filtered : vblank_ga;
+assign crtc_hsync = crtc_hs;
+assign crtc_vsync = crtc_vs;
+assign crtc_de_o  = crtc_de;
 
 crt_filter crt_filter
 (

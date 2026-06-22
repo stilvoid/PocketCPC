@@ -1,6 +1,19 @@
 {
   "interact": {
     "magic": "APF_VER_1",
-    "variables": []
+    "variables": [
+      {
+        "name": "Zoom Playfield",
+        "id": 1,
+        "type": "check",
+        "enabled": true,
+        "persist": false,
+        "address": "0x00000034",
+        "defaultval": 0,
+        "value": 1,
+        "value_off": 0,
+        "mask": "0xFFFFFFFE"
+      }
+    ]
   }
 }

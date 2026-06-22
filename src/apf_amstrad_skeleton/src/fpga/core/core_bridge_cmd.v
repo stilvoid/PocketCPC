@@ -32,6 +32,7 @@ input   wire    [31:0]  bridge_wr_data,
 input   wire            status_boot_done,           // assert when PLLs lock and logic is ready
 input   wire            status_setup_done,          // assert when core is happy with what's been loaded into it
 input   wire            status_running,             // assert when pocket's taken core out of reset and is running
+output  reg     [31:0]  osnotify_display_mode,
 
 output  reg             dataslot_requestread,
 output  reg     [15:0]  dataslot_requestread_id,
@@ -221,6 +222,7 @@ initial begin
     savestate_start <= 0;
     savestate_load <= 0;
     osnotify_inmenu <= 0;
+    osnotify_display_mode <= 0;
     
     status_setup_done_queue <= 0;
     target_dataslot_read_queue <= 0;
@@ -535,6 +537,11 @@ always @(posedge clk) begin
         16'h00B0: begin
             // OS Notify: Menu State
             osnotify_inmenu <= host_20[0];
+            hstate <= ST_DONE_OK;
+        end
+        16'h00B8: begin
+            // OS Notify: Display Mode
+            osnotify_display_mode <= host_20;
             hstate <= ST_DONE_OK;
         end
         default: begin

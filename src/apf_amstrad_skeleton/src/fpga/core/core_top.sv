@@ -306,6 +306,9 @@ wire        cpc_rgb_hsync;
 wire        cpc_rgb_vsync;
 wire        cpc_rgb_hblank;
 wire        cpc_rgb_vblank;
+wire        cpc_crtc_hsync;
+wire        cpc_crtc_vsync;
+wire        cpc_crtc_de;
 wire        cpc_video_phase_n;
 wire        cpc_video_phase_p;
 wire [1:0]  cpc_video_mode;
@@ -459,6 +462,9 @@ cpc_machine_pocket cpc_machine (
     .rgb_vsync       ( cpc_rgb_vsync ),
     .rgb_hblank      ( cpc_rgb_hblank ),
     .rgb_vblank      ( cpc_rgb_vblank ),
+    .crtc_hsync      ( cpc_crtc_hsync ),
+    .crtc_vsync      ( cpc_crtc_vsync ),
+    .crtc_de         ( cpc_crtc_de ),
     .video_phase_n   ( cpc_video_phase_n ),
     .video_phase_p   ( cpc_video_phase_p ),
     .video_mode      ( cpc_video_mode ),
@@ -505,7 +511,18 @@ reg [2:0] cpc_hsync_delay = 3'd0;
 reg       debug_hsync_prev = 1'b0;
 reg       debug_vsync_prev = 1'b0;
 reg [2:0] debug_hsync_delay = 3'd0;
+reg       cpc_zoom_de_prev = 1'b0;
+reg       cpc_playfield_de = 1'b0;
+reg       cpc_playfield_hs = 1'b0;
+reg       cpc_playfield_vs = 1'b0;
+reg       cpc_crtc_hsync_prev = 1'b0;
+reg       cpc_crtc_vsync_prev = 1'b0;
+reg [2:0] cpc_crtc_hsync_delay = 3'd0;
 wire [23:0] cpc_overlay_rgb;
+wire        cpc_zoom_selected;
+wire        cpc_zoom_visible;
+wire [23:0] cpc_display_rgb;
+wire [23:0] cpc_video_slot_rgb;
 wire       cpc_apf_ce = cpc_ce_16;
 
 always @(posedge cpc_clk) begin
@@ -550,14 +567,25 @@ always @(posedge cpc_clk) begin
         cpc_hsync_prev <= 1'b0;
         cpc_vsync_prev <= 1'b0;
         cpc_hsync_delay <= 3'd0;
+        cpc_zoom_de_prev <= 1'b0;
+        cpc_playfield_de <= 1'b0;
+        cpc_playfield_hs <= 1'b0;
+        cpc_playfield_vs <= 1'b0;
+        cpc_crtc_hsync_prev <= 1'b0;
+        cpc_crtc_vsync_prev <= 1'b0;
+        cpc_crtc_hsync_delay <= 3'd0;
     end else if (cpc_apf_ce) begin
         cpc_native_de <= 1'b0;
         cpc_native_hs <= 1'b0;
+        cpc_playfield_de <= 1'b0;
+        cpc_playfield_hs <= 1'b0;
         cpc_native_rgb <= 24'h000000;
-
         if (cpc_rom_loaded && !cpc_rgb_hblank && !cpc_rgb_vblank) begin
             cpc_native_de <= 1'b1;
             cpc_native_rgb <= cpc_rgb;
+        end
+        if (cpc_rom_loaded && cpc_crtc_de && !cpc_rgb_vblank) begin
+            cpc_playfield_de <= 1'b1;
         end
 
         if (cpc_hsync_delay != 3'd0) begin
@@ -572,9 +600,25 @@ always @(posedge cpc_clk) begin
             cpc_hsync_delay <= 3'd7;
         end
 
+        if (cpc_crtc_hsync_delay != 3'd0) begin
+            cpc_crtc_hsync_delay <= cpc_crtc_hsync_delay - 3'd1;
+        end
+
+        if (cpc_crtc_hsync_delay == 3'd1) begin
+            cpc_playfield_hs <= 1'b1;
+        end
+
+        if (!cpc_crtc_hsync_prev && cpc_crtc_hsync) begin
+            cpc_crtc_hsync_delay <= 3'd7;
+        end
+
         cpc_native_vs <= !cpc_vsync_prev && cpc_rgb_vsync;
+        cpc_playfield_vs <= !cpc_crtc_vsync_prev && cpc_crtc_vsync;
         cpc_hsync_prev <= cpc_rgb_hsync;
         cpc_vsync_prev <= cpc_rgb_vsync;
+        cpc_crtc_hsync_prev <= cpc_crtc_hsync;
+        cpc_crtc_vsync_prev <= cpc_crtc_vsync;
+        cpc_zoom_de_prev <= cpc_zoom_selected ? cpc_playfield_de : cpc_native_de;
     end
 end
 
@@ -663,19 +707,28 @@ cpc_virtual_keyboard_overlay cpc_vkb_overlay (
     .rgb_out        ( cpc_overlay_rgb )
 );
 
+assign cpc_zoom_selected = interact_config_cpc[0] &
+                           ~cpc_vkb_active &
+                           ~cpc_snapshot_busy_reset &
+                           ~cpc_sna_load;
+assign cpc_zoom_visible = cpc_zoom_selected ? cpc_playfield_de : cpc_native_de;
+assign cpc_display_rgb = cpc_vkb_active ? cpc_overlay_rgb : cpc_native_rgb;
+assign cpc_video_slot_rgb = {10'b0, cpc_zoom_selected, 10'b0, 3'b0};
+
 wire [23:0] apf_video_rgb_next =
     DEBUG_FORCE_POCKET_VIDEO ? debug_native_rgb :
-    (cpc_rom_loaded ? (cpc_vkb_active ? cpc_overlay_rgb : cpc_native_rgb) :
+    (cpc_rom_loaded ? ((cpc_zoom_de_prev && !cpc_zoom_visible) ? cpc_video_slot_rgb :
+                      (cpc_zoom_visible ? cpc_display_rgb : 24'h000000)) :
                       (visible ? display_rgb : 24'h000000));
 wire apf_video_de_next =
     DEBUG_FORCE_POCKET_VIDEO ? debug_native_de :
-    (cpc_rom_loaded ? cpc_native_de : visible);
+    (cpc_rom_loaded ? cpc_zoom_visible : visible);
 wire apf_video_hs_next =
     DEBUG_FORCE_POCKET_VIDEO ? debug_native_hs :
-    (cpc_rom_loaded ? cpc_native_hs : ~h_sync);
+    (cpc_rom_loaded ? (cpc_zoom_selected ? cpc_playfield_hs : cpc_native_hs) : ~h_sync);
 wire apf_video_vs_next =
     DEBUG_FORCE_POCKET_VIDEO ? debug_native_vs :
-    (cpc_rom_loaded ? cpc_native_vs : ~v_sync);
+    (cpc_rom_loaded ? (cpc_zoom_selected ? cpc_playfield_vs : cpc_native_vs) : ~v_sync);
 
 always @(posedge cpc_clk) begin
     if (!video_domain_reset_n) begin
@@ -762,6 +815,7 @@ sound_i2s #(
 wire [31:0] control;
 wire [31:0] model_config;
 wire [31:0] av_config;
+wire [31:0] interact_config;
 wire [31:0] media_flags;
 wire [31:0] loader_slot;
 wire [31:0] loader_addr;
@@ -770,6 +824,7 @@ wire [31:0] loader_command;
 wire [31:0] bridge_status;
 wire [31:0] regs_bridge_rd_data;
 wire [31:0] cmd_bridge_rd_data;
+wire [31:0] interact_config_cpc;
 wire        savestate_start;
 wire        savestate_load;
 wire [9:0]  datatable_addr;
@@ -919,6 +974,7 @@ synch_3 #(.WIDTH(32)) tape_dataslot_size_sync(tape_dataslot_size_74, tape_datasl
 synch_3 sna_dataslot_toggle_sync(sna_dataslot_toggle_74, sna_dataslot_toggle_cpc, cpc_clk);
 synch_3 #(.WIDTH(16)) sna_dataslot_id_sync(sna_dataslot_id_74, sna_dataslot_id_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) sna_dataslot_size_sync(sna_dataslot_size_74, sna_dataslot_size_cpc, cpc_clk);
+synch_3 #(.WIDTH(32)) interact_config_sync(interact_config, interact_config_cpc, cpc_clk);
 synch_3 target_dataslot_ack_sync(target_dataslot_ack, target_dataslot_ack_cpc, cpc_clk);
 synch_3 target_dataslot_done_sync(target_dataslot_done, target_dataslot_done_cpc, cpc_clk);
 synch_3 #(.WIDTH(3)) target_dataslot_err_sync(target_dataslot_err, target_dataslot_err_cpc, cpc_clk);
@@ -949,6 +1005,7 @@ pocket_bridge_regs regs (
     .control        ( control ),
     .model_config   ( model_config ),
     .av_config      ( av_config ),
+    .interact_config ( interact_config ),
     .media_flags    ( media_flags ),
     .loader_slot    ( loader_slot ),
     .loader_addr    ( loader_addr ),
@@ -1114,6 +1171,7 @@ core_bridge_cmd cmd (
     .status_boot_done            ( core_reset_n & cpc_pll_ready_74 ),
     .status_setup_done           ( core_reset_n & cpc_pll_ready_74 ),
     .status_running              ( host_reset_stable_n ),
+    .osnotify_display_mode       ( ),
 
     .dataslot_requestread        ( ),
     .dataslot_requestread_id     ( ),
