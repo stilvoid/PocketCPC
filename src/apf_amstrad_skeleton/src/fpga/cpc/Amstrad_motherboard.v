@@ -75,6 +75,7 @@ module Amstrad_motherboard
 	output        crtc_hsync,
 	output        crtc_vsync,
 	output        crtc_de_o,
+	output        video_de_o,
 	output        field,
 
 	input  [15:0] vram_din,
@@ -222,6 +223,7 @@ wire romen_n;
 
 wire hsync_ga, hsync_filtered;
 wire vsync_ga, vsync_filtered;
+wire video_de_ga;
 
 wire hblank_filtered;
 wire vblank_ga, vblank_filtered;
@@ -233,6 +235,7 @@ assign vblank = sync_filter ? vblank_filtered : vblank_ga;
 assign crtc_hsync = crtc_hs;
 assign crtc_vsync = crtc_vs;
 assign crtc_de_o  = crtc_de;
+assign video_de_o = video_de_ga;
 
 crt_filter crt_filter
 (
@@ -279,6 +282,7 @@ ga40010 GateArray (
 	.HSYNC_O(hsync_ga),
 	.VSYNC_O(vsync_ga),
 	.VBLANK(vblank_ga),
+	.VIDEO_DE(video_de_ga),
 	.MODE(mode),
 	.SYNC_N(),
 	.INT_N(INT_n),

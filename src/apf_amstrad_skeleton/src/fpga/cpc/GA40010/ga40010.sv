@@ -64,6 +64,7 @@ module ga40010 (
 	output SYNC_N,
 	output reg INT_N,
 	output VBLANK,
+	output VIDEO_DE,
 
 	output BLUE_OE_N,  // BLUE   50%
 	output BLUE,       // BLUE  100%
@@ -277,6 +278,7 @@ video video_sync(
 	.BORDER(border),
 	.INKR(inkr),
 	.FORCE_BLANK(HCNTLT28 | HSYNC_I),
+	.DISPLAY_ACTIVE(VIDEO_DE),
 	.BLUE_OE_N(BLUE_OE_N),
 	.BLUE(BLUE),
 	.GREEN_OE_N(GREEN_OE_N),

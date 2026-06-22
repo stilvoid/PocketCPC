@@ -36,6 +36,7 @@ module video (
 	input [4:0]INKR[16],
 	input FORCE_BLANK, // u1801
 
+	output wire DISPLAY_ACTIVE,
 	output reg BLUE_OE_N,
 	output reg BLUE,
 	output reg GREEN_OE_N,
@@ -61,6 +62,8 @@ reg colour_keep, ink_sel, border_sel, shift, keep;
 
 wire u1008 = load ? DISPEN_BUF : u1005;
 wire u1017 = mode_is_2 | (u1007 & u1013) | (mode_is_1 & u1013);
+
+assign DISPLAY_ACTIVE = u1008;
 
 always @(posedge clk) begin
 	if (cen_16) begin

@@ -76,6 +76,7 @@ module cpc_machine_pocket (
     output wire        crtc_hsync,
     output wire        crtc_vsync,
     output wire        crtc_de,
+    output wire        video_de,
     output wire        video_phase_n,
     output wire        video_phase_p,
     output wire [1:0]  video_mode,
@@ -238,6 +239,7 @@ Amstrad_motherboard motherboard (
     .crtc_hsync(crtc_hsync),
     .crtc_vsync(crtc_vsync),
     .crtc_de_o(crtc_de),
+    .video_de_o(video_de),
     .field(field),
 
     .vram_din(vram_din),
