@@ -37,6 +37,7 @@ localparam [31:0] STATUS_ROM_OK = 32'h0000_0002;
 assign status = STATUS_DUMMY;
 
 wire [15:0] reg_addr = bridge_addr[15:0];
+wire        regs_selected = (bridge_addr[31:16] == 16'h0000);
 
 always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
@@ -49,7 +50,7 @@ always @(posedge clk or negedge reset_n) begin
         loader_addr    <= 32'h0000_0000;
         loader_data    <= 32'h0000_0000;
         loader_command <= 32'h0000_0000;
-    end else if (bridge_wr) begin
+    end else if (bridge_wr && regs_selected) begin
         if (reg_addr == 16'h0034) begin
             interact_config <= bridge_wr_data;
         end else begin
@@ -73,7 +74,9 @@ always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         bridge_rd_data <= 32'h0000_0000;
     end else begin
-        if (reg_addr == 16'h0034) begin
+        if (!regs_selected) begin
+            bridge_rd_data <= 32'h0000_0000;
+        end else if (reg_addr == 16'h0034) begin
             bridge_rd_data <= interact_config;
         end else begin
             case (reg_addr)
