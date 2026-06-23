@@ -526,7 +526,10 @@ reg       cpc_playfield_vs = 1'b0;
 reg       cpc_crtc_hsync_prev = 1'b0;
 reg       cpc_crtc_vsync_prev = 1'b0;
 reg [2:0] cpc_crtc_hsync_delay = 3'd0;
-wire [23:0] cpc_overlay_rgb;
+wire [23:0] cpc_overlay_native_rgb;
+wire [23:0] cpc_overlay_zoom_rgb;
+wire        cpc_overlay_native_on;
+wire        cpc_overlay_zoom_on;
 wire        cpc_zoom_selected;
 wire        cpc_zoom_visible;
 wire [23:0] cpc_display_rgb;
@@ -723,28 +726,51 @@ always @(*) begin
     end
 end
 
-cpc_virtual_keyboard_overlay cpc_vkb_overlay (
+cpc_virtual_keyboard_overlay cpc_vkb_native_overlay (
     .clk            ( cpc_clk ),
     .reset_n        ( cpc_reset_n ),
     .ce             ( cpc_apf_ce ),
     .de             ( cpc_native_de ),
     .vs             ( cpc_native_vs ),
     .rgb_in         ( cpc_native_rgb ),
-    .active         ( cpc_vkb_active & cpc_rom_loaded ),
+    .active         ( cpc_vkb_active & cpc_rom_loaded & ~cpc_zoom_selected ),
     .selected_index ( cpc_vkb_index ),
     .page           ( cpc_vkb_page ),
     .shift_active   ( cpc_vkb_shift ),
     .ctrl_active    ( cpc_vkb_ctrl ),
     .caps_active    ( cpc_vkb_caps ),
-    .rgb_out        ( cpc_overlay_rgb )
+    .rgb_out        ( cpc_overlay_native_rgb ),
+    .overlay_on     ( cpc_overlay_native_on )
+);
+
+cpc_virtual_keyboard_overlay #(
+    .X0(10'd20),
+    .Y0(9'd112)
+) cpc_vkb_zoom_overlay (
+    .clk            ( cpc_clk ),
+    .reset_n        ( cpc_reset_n ),
+    .ce             ( cpc_apf_ce ),
+    .de             ( cpc_playfield_de ),
+    .vs             ( cpc_playfield_vs ),
+    .rgb_in         ( cpc_native_rgb ),
+    .active         ( cpc_vkb_active & cpc_rom_loaded & cpc_zoom_selected ),
+    .selected_index ( cpc_vkb_index ),
+    .page           ( cpc_vkb_page ),
+    .shift_active   ( cpc_vkb_shift ),
+    .ctrl_active    ( cpc_vkb_ctrl ),
+    .caps_active    ( cpc_vkb_caps ),
+    .rgb_out        ( cpc_overlay_zoom_rgb ),
+    .overlay_on     ( cpc_overlay_zoom_on )
 );
 
 assign cpc_zoom_selected = interact_config_cpc[0] &
-                           ~cpc_vkb_active &
                            ~cpc_snapshot_busy_reset &
                            ~cpc_sna_load;
 assign cpc_zoom_visible = cpc_zoom_selected ? cpc_playfield_de : cpc_native_de;
-assign cpc_display_rgb = cpc_vkb_active ? cpc_overlay_rgb : cpc_native_rgb;
+assign cpc_display_rgb =
+    cpc_overlay_zoom_on ? cpc_overlay_zoom_rgb :
+    cpc_overlay_native_on ? cpc_overlay_native_rgb :
+    cpc_native_rgb;
 assign cpc_video_slot_rgb = {10'b0, cpc_zoom_selected, 10'b0, 3'b0};
 
 wire [23:0] apf_video_rgb_next =

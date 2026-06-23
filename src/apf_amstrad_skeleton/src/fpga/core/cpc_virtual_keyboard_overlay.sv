@@ -2,7 +2,10 @@
 
 `default_nettype none
 
-module cpc_virtual_keyboard_overlay (
+module cpc_virtual_keyboard_overlay #(
+    parameter [9:0] X0 = 10'd84,
+    parameter [8:0] Y0 = 9'd152
+) (
     input  wire        clk,
     input  wire        reset_n,
     input  wire        ce,
@@ -15,11 +18,10 @@ module cpc_virtual_keyboard_overlay (
     input  wire        shift_active,
     input  wire        ctrl_active,
     input  wire        caps_active,
-    output reg  [23:0] rgb_out
+    output reg  [23:0] rgb_out,
+    output reg         overlay_on
 );
 
-localparam [9:0] X0    = 10'd84;
-localparam [8:0] Y0    = 9'd152;
 localparam [9:0] KEY_W = 10'd40;
 localparam [9:0] X1    = X0 + 10'd600;
 localparam [8:0] Y1    = Y0 + 9'd80;
@@ -230,7 +232,6 @@ reg        selected_r = 1'b0;
 reg        border_r = 1'b0;
 reg [23:0] key_fill_r = 24'h202020;
 reg [23:0] key_border_r = 24'h606060;
-reg [23:0] rgb_in_r = 24'h000000;
 
 function key_is_alpha;
     input [6:0] key_index;
@@ -686,8 +687,8 @@ always @(posedge clk) begin
         border_r     <= 1'b0;
         key_fill_r   <= 24'h202020;
         key_border_r <= 24'h606060;
-        rgb_in_r     <= 24'h000000;
         rgb_out      <= 24'h000000;
+        overlay_on   <= 1'b0;
     end else if (ce) begin
         if (!vs_prev && vs) begin
             y <= 9'd0;
@@ -709,12 +710,12 @@ always @(posedge clk) begin
         border_r     <= border;
         key_fill_r   <= key_fill;
         key_border_r <= key_border;
-        rgb_in_r     <= rgb_in;
+        overlay_on   <= in_band_r;
 
         if (in_band_r && glyph_on_r) rgb_out <= selected_r ? 24'h000000 : 24'hffffff;
         else if (in_band_r && border_r) rgb_out <= selected_r ? 24'hffffff : key_border_r;
         else if (in_band_r) rgb_out <= selected_r ? 24'hffd000 : key_fill_r;
-        else rgb_out <= rgb_in_r;
+        else rgb_out <= rgb_in;
     end
 end
 
