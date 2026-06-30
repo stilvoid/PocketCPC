@@ -52,14 +52,20 @@ install-pocket: check
 	@echo "Installed $(CORE_ID) to $(POCKET_SD)"
 	@if [ "$(EJECT_AFTER_INSTALL)" = "1" ]; then \
 		echo "Flushing writes and ejecting $(POCKET_SD)"; \
-		disk_id=$$(diskutil info "$(POCKET_SD)" | awk -F': *' '/Part of Whole/ {print $$2; exit}'); \
+		resolved_sd=$$(cd "$(POCKET_SD)" && pwd -P); \
+		disk_id=$$(diskutil info "$$resolved_sd" | awk -F': *' '/Part of Whole/ {print $$2; exit}'); \
+		if [ -z "$$disk_id" ]; then \
+			disk_id=$$(diskutil info "$$resolved_sd" | awk -F': *' '/Device Identifier/ {print $$2; exit}'); \
+		fi; \
 		sync; \
-		if ! diskutil eject "$(POCKET_SD)"; then \
+		if [ -n "$$disk_id" ] && diskutil eject "$$disk_id"; then \
+			:; \
+		else \
 			if [ -z "$$disk_id" ]; then \
-				echo "Unable to determine disk identifier for $(POCKET_SD)" >&2; \
+				echo "Unable to determine disk identifier for $$resolved_sd" >&2; \
 				exit 1; \
 			fi; \
-			echo "Normal eject failed; forcing unmount of $$disk_id"; \
+			echo "Whole-disk eject failed; forcing unmount of $$disk_id"; \
 			diskutil unmountDisk force "$$disk_id"; \
 			diskutil eject "$$disk_id"; \
 		fi; \
