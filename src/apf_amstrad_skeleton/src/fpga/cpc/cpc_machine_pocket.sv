@@ -155,8 +155,11 @@ wire [255:0] rom_map;
 wire [8:0]  tape_mix = {3'd0, tape_out, 1'b0, (tape_in & tape_motor), 3'd0};
 wire [8:0]  audio_mix_l = {1'b0, audio_l} + tape_mix;
 wire [8:0]  audio_mix_r = {1'b0, audio_r} + tape_mix;
-wire [7:0]  audio_mix_l_sat = audio_mix_l[8] ? 8'hff : audio_mix_l[7:0];
-wire [7:0]  audio_mix_r_sat = audio_mix_r[8] ? 8'hff : audio_mix_r[7:0];
+// The current Pocket audio path behaves cleanly for the lower 7-bit range.
+// When the PSG side plus tape exceeds 127, the sign bit flips downstream and
+// dense passages fold over audibly instead of just getting louder.
+wire [7:0]  audio_mix_l_sat = (audio_mix_l > 9'd127) ? 8'h7f : audio_mix_l[7:0];
+wire [7:0]  audio_mix_r_sat = (audio_mix_r > 9'd127) ? 8'h7f : audio_mix_r[7:0];
 
 cpc_ram_rom memory (
     .clk          ( clk ),
