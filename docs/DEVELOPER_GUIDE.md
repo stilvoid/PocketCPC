@@ -717,6 +717,10 @@ From the repository root:
 ```bash
 make check
 make build-skeleton
+make build-status
+make build-log
+make build-wait
+make build-stop
 make install-pocket
 ```
 
@@ -742,6 +746,22 @@ It runs the Docker-based Quartus build script:
 - `scripts/build_skeleton_docker.sh`
 
 The build emits a raw Quartus `.rbf`, then converts it into Pocket format as `bitstream.rbf_r` by reversing the bit order in each byte.
+
+The Docker wrapper now also:
+
+- uses a fixed container name for status/stop/wait operations
+- writes a build log under `src/apf_amstrad_skeleton/src/fpga/output_files/build_monitor/`
+- writes `Cores/steve.AmstradCPC/build-info.txt` alongside the packaged bitstream
+- updates `bitstream.rbf_r` atomically only after a successful Quartus run
+
+Quiet periods during fitter or timing analysis are normal. Prefer:
+
+- `make build-status` to check whether the container is still running
+- `make build-log` to inspect the most recent captured build output
+- `make build-wait` to wait for a running build without guessing whether it hung
+
+`make install-pocket` now refuses to install a packaged bitstream if Quartus
+input files under `src/fpga/` are newer than `bitstream.rbf_r`.
 
 ## A few Verilog details that will help you read this repo
 

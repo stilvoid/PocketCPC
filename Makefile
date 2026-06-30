@@ -11,6 +11,7 @@ POCKET_ASSET_DIR := $(POCKET_SD)/Assets/$(PLATFORM_ID)/$(CORE_ID)
 BOOT_ROM_SOURCE ?= upstreams/Amstrad_MiSTer/releases/boot.rom
 
 .PHONY: check build-skeleton install-pocket
+.PHONY: build-status build-log build-wait build-stop build-freshness
 
 check:
 	python3 scripts/check_expected_files.py
@@ -19,9 +20,25 @@ check:
 build-skeleton:
 	scripts/build_skeleton_docker.sh
 
+build-status:
+	scripts/build_skeleton_docker.sh status
+
+build-log:
+	scripts/build_skeleton_docker.sh log
+
+build-wait:
+	scripts/build_skeleton_docker.sh wait
+
+build-stop:
+	scripts/build_skeleton_docker.sh stop
+
+build-freshness:
+	scripts/build_skeleton_docker.sh freshness
+
 install-pocket: check
 	@test -d "$(POCKET_SD)" || (echo "Pocket SD mount not found: $(POCKET_SD)" >&2; exit 1)
 	@test -f "$(SKELETON)/Cores/$(CORE_ID)/bitstream.rbf_r" || (echo "Missing packaged bitstream; run make build-skeleton" >&2; exit 1)
+	@scripts/build_skeleton_docker.sh assert-fresh
 	mkdir -p "$(POCKET_SD)/Cores" "$(POCKET_PLATFORM_DIR)" "$(POCKET_SD)/Assets/$(PLATFORM_ID)"
 	find "$(POCKET_CORE_DIR)" "$(POCKET_ASSET_DIR)" -name '._*' -delete 2>/dev/null || true
 	find "$(POCKET_PLATFORM_DIR)" -maxdepth 1 -name '._$(PLATFORM_ID).json' -delete 2>/dev/null || true

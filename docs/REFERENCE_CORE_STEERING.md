@@ -35,15 +35,32 @@ For every subsystem change:
 
 Avoid rebuilding, reinstalling, or manually retesting artefacts whose hardware
 behavior is already known. When a proposed step only rolls back to, or
-recreates, a build the user has already tested, do not spend a Quartus cycle or
-ask for another Pocket test unless the goal is explicitly to recover the Pocket
-to that known state for comparison or recovery. Iterate the design first, then
-build only when the generated artefact should provide new information on
-hardware.
+recreates, a build the user has already tested, do not spend a Quartus cycle,
+run `make install-pocket`, or ask for another Pocket test unless the user
+explicitly wants the Pocket recovered to that known state for comparison or
+recovery. Iterate the design first, then build only when the generated artefact
+should provide new information on hardware.
 
 Before starting a long build, state what will be learned from that artefact. If
 the answer is "it should behave like the previous build", skip the build and
 continue analysis or implementation instead.
+
+When running `make build-skeleton` or other Quartus-in-Docker builds, expect
+long quiet periods with no terminal output. Do not treat silence alone as a
+hang and do not interrupt the build just because fitter or timing analysis has
+been quiet for a while.
+
+When checking whether a Docker build is still progressing, prefer the least
+disruptive checks first:
+
+- `docker ps` to confirm the Quartus container is still running.
+- Artefact timestamps such as `bitstream.rbf_r` and the Quartus
+  `output_files/*.summary` reports to see whether the build has advanced.
+- Only inspect host processes with `ps` if container state and artefact
+  timestamps disagree or some thread-specific wrapper state truly requires it.
+
+Avoid triggering approval prompts for routine build monitoring when the same
+question can be answered with `docker ps` or file timestamps.
 
 Use git history to mark confirmed hardware progress, not speculative source
 states. Do not commit a hardware-facing change until the resulting build has

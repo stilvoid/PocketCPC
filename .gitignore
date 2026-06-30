@@ -1,7 +1,9 @@
 upstreams/
+pocket
 
 src/apf_amstrad_skeleton/src/fpga/db/
 src/apf_amstrad_skeleton/src/fpga/incremental_db/
 src/apf_amstrad_skeleton/src/fpga/output_files/
 src/apf_amstrad_skeleton/src/fpga/simulation/
 src/apf_amstrad_skeleton/src/fpga/c5_pin_model_dump.txt
+src/apf_amstrad_skeleton/Cores/steve.AmstradCPC/build-info.txt
