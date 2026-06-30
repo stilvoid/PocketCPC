@@ -998,8 +998,8 @@ always @(*) begin
     macro_ps2_valid = 1'b0;
     macro_body_step = 6'd0;
 
-    // Select toggles the on-screen keyboard locally, and Start is consumed by
-    // the existing core reset path in core_top.
+    // Select toggles the on-screen keyboard locally. Start is intentionally
+    // left unbound here so restart can live behind the Pocket menu instead.
     next_pending[14] = 1'b0;
     next_pending[15] = 1'b0;
 

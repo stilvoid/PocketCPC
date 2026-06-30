@@ -39,11 +39,6 @@
             "id": 14,
             "name": "Virtual Keyboard",
             "key": "pad_btn_select"
-          },
-          {
-            "id": 15,
-            "name": "Reset",
-            "key": "pad_btn_start"
           }
         ]
       }

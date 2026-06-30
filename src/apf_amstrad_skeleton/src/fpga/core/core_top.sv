@@ -377,12 +377,18 @@ wire        cpc_vkb_shift;
 wire        cpc_vkb_ctrl;
 wire        cpc_vkb_caps;
 wire        cpc_vkb_caps_pulse;
+wire        restart_request_toggle_cpc;
+reg         restart_request_toggle_cpc_d = 1'b0;
+reg  [5:0]  cpc_menu_restart_count = 6'd0;
+wire        cpc_menu_restart_pulse = restart_request_toggle_cpc ^ restart_request_toggle_cpc_d;
+wire        cpc_menu_restart_active = (cpc_menu_restart_count != 6'd0);
 
 synch_3 host_reset_sync_cpc(host_reset_stable_n, host_reset_n_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_key_sync_cpc(cont3_key, cont3_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_joy_sync_cpc(cont3_joy, cont3_joy_cpc, cpc_clk);
 synch_3 #(.WIDTH(16)) cont3_trig_sync_cpc(cont3_trig, cont3_trig_cpc, cpc_clk);
+synch_3 restart_request_sync_cpc(restart_request_toggle, restart_request_toggle_cpc, cpc_clk);
 
 cpc_pocket_input cpc_input (
     .clk       ( cpc_clk ),
@@ -405,7 +411,7 @@ cpc_pocket_input cpc_input (
 
 cpc_machine_pocket cpc_machine (
     .clk             ( cpc_clk ),
-    .reset           ( !cpc_reset_n | cont1_key_cpc[15] ),
+    .reset           ( !cpc_reset_n | cpc_menu_restart_active ),
     .rom_reset       ( !cpc_loader_reset_n ),
     .ce_16           ( cpc_ce_16 ),
     .ce_pix          ( cpc_ce_16 ),
@@ -491,12 +497,25 @@ localparam integer CPC_RASTER_TIGHT_RIGHT      = 704;
 localparam integer CPC_RASTER_TIGHT_TOP        = 40;
 localparam integer CPC_RASTER_TIGHT_BOTTOM     = 240;
 localparam integer CPC_RASTER_OVERSCAN_TOP     = 1;
+localparam integer CPC_RASTER_OVERSCAN_WIDTH   = 768;
+localparam integer CPC_RASTER_OVERSCAN_HEIGHT  = 272;
+localparam integer CPC_RASTER_OVERSCAN_LEFT    = 0;
+localparam integer CPC_RASTER_OVERSCAN_RIGHT   = CPC_RASTER_OVERSCAN_LEFT + CPC_RASTER_OVERSCAN_WIDTH;
+localparam integer CPC_RASTER_OVERSCAN_BOTTOM  = CPC_RASTER_OVERSCAN_TOP + CPC_RASTER_OVERSCAN_HEIGHT;
 localparam integer CPC_RASTER_DEFAULT_WIDTH    = 696;
 localparam integer CPC_RASTER_DEFAULT_HEIGHT   = 224;
 localparam integer CPC_RASTER_DEFAULT_LEFT     = 36;
 localparam integer CPC_RASTER_DEFAULT_RIGHT    = 732;
 localparam integer CPC_RASTER_DEFAULT_TOP      = 28;
 localparam integer CPC_RASTER_DEFAULT_BOTTOM   = 252;
+localparam integer CPC_ACTIVITY_INDICATOR_X    = 8;
+localparam integer CPC_ACTIVITY_INDICATOR_Y    = 10;
+localparam integer CPC_ACTIVITY_INDICATOR_W    = 14;
+localparam integer CPC_ACTIVITY_INDICATOR_H    = 6;
+localparam [22:0]  CPC_ACTIVITY_HOLD_CYCLES    = 23'd8_000_000;
+localparam [17:0]  CPC_DISK_CLICK_CYCLES       = 18'd120_000;
+localparam [7:0]   CPC_DISK_CLICK_LEVEL_LOUD   = 8'd18;
+localparam [7:0]   CPC_DISK_CLICK_LEVEL_SOFT   = 8'd9;
 localparam [1:0]  CPC_ZOOM_PRESET_DEFAULT      = 2'd0;
 localparam [1:0]  CPC_ZOOM_PRESET_TIGHT        = 2'd1;
 localparam [1:0]  CPC_ZOOM_PRESET_OVERSCAN     = 2'd2;
@@ -557,8 +576,13 @@ wire [23:0] cpc_zoom_rgb;
 wire [23:0] cpc_video_slot_rgb;
 wire        cpc_display_mode_bit0;
 wire        cpc_display_mode_bit1;
-wire       cpc_apf_ce = cpc_ce_16;
-wire cpc_raster_de_now = cpc_rom_loaded && !cpc_rgb_hblank && !cpc_rgb_vblank;
+wire        cpc_activity_indicator_enable = interact_config_cpc[2];
+wire        cpc_disk_sound_enable = interact_config_cpc[3];
+wire        cpc_disk_activity_raw;
+wire        cpc_tape_activity_raw;
+wire        cpc_media_activity_raw;
+wire        cpc_apf_ce = cpc_ce_16;
+wire        cpc_raster_de_now = cpc_rom_loaded && !cpc_rgb_hblank && !cpc_rgb_vblank;
 wire [1:0] cpc_zoom_preset = interact_config_cpc[1:0];
 wire [10:0] cpc_raster_x_now =
     cpc_raster_de_now ?
@@ -576,6 +600,42 @@ wire cpc_default_crop_active =
     (cpc_raster_x_now < CPC_RASTER_DEFAULT_RIGHT[10:0]) &&
     ({1'b0, cpc_raster_y} >= CPC_RASTER_DEFAULT_TOP[9:0]) &&
     ({1'b0, cpc_raster_y} < CPC_RASTER_DEFAULT_BOTTOM[9:0]);
+wire cpc_overscan_indicator_active =
+    cpc_raster_de_now &&
+    (cpc_raster_x_now >= (CPC_RASTER_OVERSCAN_LEFT + CPC_ACTIVITY_INDICATOR_X)) &&
+    (cpc_raster_x_now < (CPC_RASTER_OVERSCAN_LEFT + CPC_ACTIVITY_INDICATOR_X + CPC_ACTIVITY_INDICATOR_W)) &&
+    ({1'b0, cpc_raster_y} >= (CPC_RASTER_OVERSCAN_BOTTOM - CPC_ACTIVITY_INDICATOR_Y - CPC_ACTIVITY_INDICATOR_H)) &&
+    ({1'b0, cpc_raster_y} < (CPC_RASTER_OVERSCAN_BOTTOM - CPC_ACTIVITY_INDICATOR_Y));
+wire cpc_default_indicator_active =
+    cpc_raster_de_now &&
+    (cpc_raster_x_now >= (CPC_RASTER_DEFAULT_LEFT + CPC_ACTIVITY_INDICATOR_X)) &&
+    (cpc_raster_x_now < (CPC_RASTER_DEFAULT_LEFT + CPC_ACTIVITY_INDICATOR_X + CPC_ACTIVITY_INDICATOR_W)) &&
+    ({1'b0, cpc_raster_y} >= (CPC_RASTER_DEFAULT_BOTTOM - CPC_ACTIVITY_INDICATOR_Y - CPC_ACTIVITY_INDICATOR_H)) &&
+    ({1'b0, cpc_raster_y} < (CPC_RASTER_DEFAULT_BOTTOM - CPC_ACTIVITY_INDICATOR_Y));
+wire cpc_tight_indicator_active =
+    cpc_raster_de_now &&
+    (cpc_raster_x_now >= (CPC_RASTER_TIGHT_LEFT + CPC_ACTIVITY_INDICATOR_X)) &&
+    (cpc_raster_x_now < (CPC_RASTER_TIGHT_LEFT + CPC_ACTIVITY_INDICATOR_X + CPC_ACTIVITY_INDICATOR_W)) &&
+    ({1'b0, cpc_raster_y} >= (CPC_RASTER_TIGHT_BOTTOM - CPC_ACTIVITY_INDICATOR_Y - CPC_ACTIVITY_INDICATOR_H)) &&
+    ({1'b0, cpc_raster_y} < (CPC_RASTER_TIGHT_BOTTOM - CPC_ACTIVITY_INDICATOR_Y));
+reg  [22:0] cpc_media_activity_hold = 23'd0;
+reg  [22:0] cpc_disk_activity_hold = 23'd0;
+reg         cpc_disk_activity_raw_d = 1'b0;
+reg         cpc_sd_ack_d = 1'b0;
+reg  [17:0] cpc_disk_click_count = 18'd0;
+wire        cpc_media_activity_visible = (cpc_media_activity_hold != 23'd0);
+wire        cpc_disk_activity_visible = (cpc_disk_activity_hold != 23'd0);
+wire        cpc_disk_click_trigger =
+    (cpc_disk_activity_raw && !cpc_disk_activity_raw_d) ||
+    (cpc_sd_ack && !cpc_sd_ack_d);
+wire        cpc_activity_indicator_on =
+    cpc_activity_indicator_enable &&
+    cpc_media_activity_visible &&
+    (!cpc_zoom_selected ? cpc_overscan_indicator_active :
+     (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_indicator_active :
+     (cpc_zoom_preset == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_indicator_active :
+     cpc_overscan_indicator_active);
+wire [23:0] cpc_activity_indicator_rgb = 24'hf0f0f0;
 
 always @(posedge cpc_clk) begin
     if (!cpc_reset_n) begin
@@ -591,6 +651,47 @@ always @(posedge cpc_clk) begin
 
         if (cpc_div == 2'd2) cpc_apf_pixel_clk_90 <= 1'b1;
         if (cpc_div == 2'd0) cpc_apf_pixel_clk_90 <= 1'b0;
+    end
+end
+
+always @(posedge cpc_clk) begin
+    if (!cpc_reset_n) begin
+        restart_request_toggle_cpc_d <= restart_request_toggle_cpc;
+        cpc_menu_restart_count <= 6'd0;
+        cpc_media_activity_hold <= 23'd0;
+        cpc_disk_activity_hold <= 23'd0;
+        cpc_disk_activity_raw_d <= 1'b0;
+        cpc_sd_ack_d <= 1'b0;
+        cpc_disk_click_count <= 18'd0;
+    end else begin
+        restart_request_toggle_cpc_d <= restart_request_toggle_cpc;
+        cpc_disk_activity_raw_d <= cpc_disk_activity_raw;
+        cpc_sd_ack_d <= cpc_sd_ack;
+        if (cpc_menu_restart_pulse) begin
+            cpc_menu_restart_count <= 6'd32;
+        end else if (cpc_menu_restart_count != 6'd0) begin
+            cpc_menu_restart_count <= cpc_menu_restart_count - 6'd1;
+        end
+
+        if (cpc_media_activity_raw) begin
+            cpc_media_activity_hold <= CPC_ACTIVITY_HOLD_CYCLES;
+        end else if (cpc_media_activity_hold != 23'd0) begin
+            cpc_media_activity_hold <= cpc_media_activity_hold - 23'd1;
+        end
+
+        if (cpc_disk_activity_raw) begin
+            cpc_disk_activity_hold <= CPC_ACTIVITY_HOLD_CYCLES;
+        end else if (cpc_disk_activity_hold != 23'd0) begin
+            cpc_disk_activity_hold <= cpc_disk_activity_hold - 23'd1;
+        end
+
+        if (cpc_ce_16) begin
+            if (cpc_disk_click_trigger) begin
+                cpc_disk_click_count <= CPC_DISK_CLICK_CYCLES;
+            end else if (cpc_disk_click_count != 18'd0) begin
+                cpc_disk_click_count <= cpc_disk_click_count - 18'd1;
+            end
+        end
     end
 end
 
@@ -844,7 +945,8 @@ assign cpc_zoom_rgb =
 assign cpc_display_rgb =
     (cpc_zoom_selected && cpc_overlay_zoom_on) ? cpc_overlay_zoom_rgb :
     (!cpc_zoom_selected && cpc_overlay_native_on) ? cpc_overlay_native_rgb :
-    (cpc_zoom_selected ? cpc_zoom_rgb : cpc_native_rgb);
+    (cpc_activity_indicator_on ? cpc_activity_indicator_rgb :
+     (cpc_zoom_selected ? cpc_zoom_rgb : cpc_native_rgb));
 assign cpc_display_mode_bit0 = (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT);
 assign cpc_display_mode_bit1 = (cpc_zoom_preset == CPC_ZOOM_PRESET_DEFAULT);
 assign cpc_video_slot_rgb = {9'b0, cpc_display_mode_bit1, cpc_display_mode_bit0, 10'b0, 3'b0};
@@ -886,7 +988,19 @@ assign video_vs           = apf_video_vs;
 assign video_rgb_clock    = cpc_apf_pixel_clk;
 assign video_rgb_clock_90 = cpc_apf_pixel_clk_90;
 
-wire [31:0] cpc_audio_sample = {{cpc_audio_l, 8'h00}, {cpc_audio_r, 8'h00}};
+wire       cpc_disk_click_square = cpc_disk_click_count[12];
+wire [7:0] cpc_disk_click_level =
+    cpc_disk_click_count[17:16] != 2'b00 ? CPC_DISK_CLICK_LEVEL_LOUD :
+    cpc_disk_click_count[15:14] != 2'b00 ? CPC_DISK_CLICK_LEVEL_SOFT :
+    8'd0;
+wire [7:0] cpc_disk_audio =
+    (cpc_disk_sound_enable && cpc_rom_loaded && (cpc_disk_click_count != 18'd0) && cpc_disk_click_square) ?
+    cpc_disk_click_level : 8'd0;
+wire [8:0] cpc_audio_l_mix = {1'b0, cpc_audio_l} + {1'b0, cpc_disk_audio};
+wire [8:0] cpc_audio_r_mix = {1'b0, cpc_audio_r} + {1'b0, cpc_disk_audio};
+wire [7:0] cpc_audio_l_out = (cpc_audio_l_mix > 9'd127) ? 8'h7f : cpc_audio_l_mix[7:0];
+wire [7:0] cpc_audio_r_out = (cpc_audio_r_mix > 9'd127) ? 8'h7f : cpc_audio_r_mix[7:0];
+wire [31:0] cpc_audio_sample = {{cpc_audio_l_out, 8'h00}, {cpc_audio_r_out, 8'h00}};
 wire [31:0] cpc_audio_sample_mclk;
 wire        cpc_audio_sample_mclk_strobe;
 wire        cpc_audio_pll_locked;
@@ -959,6 +1073,7 @@ wire [31:0] bridge_status;
 wire [31:0] regs_bridge_rd_data;
 wire [31:0] cmd_bridge_rd_data;
 wire [31:0] interact_config_cpc;
+wire        restart_request_toggle;
 wire        savestate_start;
 wire        savestate_load;
 wire [9:0]  datatable_addr;
@@ -1022,6 +1137,9 @@ wire        dataslot_runtime_enable = cpc_loader_done & cpc_rom_loaded;
 wire        sna_client_selected = dataslot_runtime_enable & sna_target_active;
 wire        tape_client_selected = dataslot_runtime_enable & !sna_target_active & tape_target_active;
 wire        fdc_client_selected = dataslot_runtime_enable & !sna_target_active & !tape_target_active & fdc_target_active;
+assign cpc_disk_activity_raw = (cpc_sd_rd != 2'b00) || (cpc_sd_wr != 2'b00) || cpc_sd_ack || fdc_target_active;
+assign cpc_tape_activity_raw = cpc_tape_running || tape_target_active;
+assign cpc_media_activity_raw = cpc_disk_activity_raw || cpc_tape_activity_raw;
 
 reg         fdc_dataslot_toggle_74 = 1'b0;
 reg  [15:0] fdc_dataslot_id_74 = 16'd0;
@@ -1145,6 +1263,7 @@ pocket_bridge_regs regs (
     .loader_addr    ( loader_addr ),
     .loader_data    ( loader_data ),
     .loader_command ( loader_command ),
+    .restart_request_toggle ( restart_request_toggle ),
     .status         ( bridge_status )
 );
 

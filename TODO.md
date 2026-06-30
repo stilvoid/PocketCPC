@@ -27,6 +27,8 @@ importance.
 
 3. Custom CPC key <-> Pocket button mappings
    - Needed for games that expect keyboard controls instead of joystick input.
+   - See `docs/INPUT_BINDING_PLAN.md` for the current UI/implementation
+     recommendation and Pocket-framework constraints.
 
 ## Larger Features
 

@@ -27,6 +27,7 @@ module pocket_bridge_regs (
     output reg  [31:0] loader_addr,
     output reg  [31:0] loader_data,
     output reg  [31:0] loader_command,
+    output reg         restart_request_toggle,
     output wire [31:0] status
 );
 
@@ -50,9 +51,12 @@ always @(posedge clk or negedge reset_n) begin
         loader_addr    <= 32'h0000_0000;
         loader_data    <= 32'h0000_0000;
         loader_command <= 32'h0000_0000;
+        restart_request_toggle <= 1'b0;
     end else if (bridge_wr && regs_selected) begin
         if (reg_addr == 16'h0034) begin
             interact_config <= bridge_wr_data;
+        end else if (reg_addr == 16'h0038) begin
+            restart_request_toggle <= ~restart_request_toggle;
         end else begin
             case (reg_addr)
                 16'h0004: control        <= bridge_wr_data;
@@ -91,6 +95,7 @@ always @(posedge clk or negedge reset_n) begin
                 16'h0028: bridge_rd_data <= loader_data;
                 16'h002c: bridge_rd_data <= loader_command;
                 16'h0030: bridge_rd_data <= 32'h0000_0001; // ready
+                16'h0038: bridge_rd_data <= 32'h0000_0000;
                 16'h0040: bridge_rd_data <= cont1_key;
                 default:  bridge_rd_data <= 32'h0000_0000;
             endcase

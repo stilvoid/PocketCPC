@@ -9,6 +9,7 @@
         "enabled": true,
         "persist": false,
         "address": "0x00000034",
+        "mask": "0xFFFFFFFC",
         "defaultval": 0,
         "options": [
           {
@@ -24,6 +25,39 @@
             "name": "Overscan"
           }
         ]
+      },
+      {
+        "name": "Restart Core",
+        "id": 2,
+        "type": "action",
+        "enabled": true,
+        "persist": false,
+        "writeonly": true,
+        "address": "0x00000038",
+        "mask": "0x00000000",
+        "value": "0x00000001"
+      },
+      {
+        "name": "Activity Indicator",
+        "id": 3,
+        "type": "check",
+        "enabled": true,
+        "persist": true,
+        "address": "0x00000034",
+        "mask": "0xFFFFFFFB",
+        "defaultval": 0,
+        "value": "0x00000004"
+      },
+      {
+        "name": "Disk Access Sound",
+        "id": 4,
+        "type": "check",
+        "enabled": true,
+        "persist": true,
+        "address": "0x00000034",
+        "mask": "0xFFFFFFF7",
+        "defaultval": 0,
+        "value": "0x00000008"
       }
     ]
   }
