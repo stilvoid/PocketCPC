@@ -490,12 +490,13 @@ localparam integer CPC_RASTER_TIGHT_LEFT       = 64;
 localparam integer CPC_RASTER_TIGHT_RIGHT      = 704;
 localparam integer CPC_RASTER_TIGHT_TOP        = 40;
 localparam integer CPC_RASTER_TIGHT_BOTTOM     = 240;
-localparam integer CPC_RASTER_DEFAULT_WIDTH    = 672;
-localparam integer CPC_RASTER_DEFAULT_HEIGHT   = 232;
-localparam integer CPC_RASTER_DEFAULT_LEFT     = 48;
-localparam integer CPC_RASTER_DEFAULT_RIGHT    = 720;
-localparam integer CPC_RASTER_DEFAULT_TOP      = 24;
-localparam integer CPC_RASTER_DEFAULT_BOTTOM   = 256;
+localparam integer CPC_RASTER_OVERSCAN_TOP     = 1;
+localparam integer CPC_RASTER_DEFAULT_WIDTH    = 696;
+localparam integer CPC_RASTER_DEFAULT_HEIGHT   = 224;
+localparam integer CPC_RASTER_DEFAULT_LEFT     = 36;
+localparam integer CPC_RASTER_DEFAULT_RIGHT    = 732;
+localparam integer CPC_RASTER_DEFAULT_TOP      = 28;
+localparam integer CPC_RASTER_DEFAULT_BOTTOM   = 252;
 localparam [1:0]  CPC_ZOOM_PRESET_DEFAULT      = 2'd0;
 localparam [1:0]  CPC_ZOOM_PRESET_TIGHT        = 2'd1;
 localparam [1:0]  CPC_ZOOM_PRESET_OVERSCAN     = 2'd2;
@@ -644,7 +645,7 @@ always @(posedge cpc_clk) begin
         cpc_default_de <= 1'b0;
         cpc_default_rgb <= 24'h000000;
         cpc_native_rgb <= 24'h000000;
-        if (cpc_raster_de_now) begin
+        if (cpc_raster_de_now && (cpc_raster_y >= CPC_RASTER_OVERSCAN_TOP[8:0])) begin
             cpc_native_de <= 1'b1;
             cpc_native_rgb <= cpc_rgb;
         end
