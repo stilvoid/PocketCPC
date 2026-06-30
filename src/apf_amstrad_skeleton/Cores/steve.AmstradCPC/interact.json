@@ -3,16 +3,27 @@
     "magic": "APF_VER_1",
     "variables": [
       {
-        "name": "Zoom Playfield",
+        "name": "Display Framing",
         "id": 1,
-        "type": "check",
+        "type": "list",
         "enabled": true,
         "persist": false,
         "address": "0x00000034",
         "defaultval": 0,
-        "value": 1,
-        "value_off": 0,
-        "mask": "0xFFFFFFFE"
+        "options": [
+          {
+            "value": 0,
+            "name": "Default"
+          },
+          {
+            "value": 1,
+            "name": "Tight"
+          },
+          {
+            "value": 2,
+            "name": "Overscan"
+          }
+        ]
       }
     ]
   }
