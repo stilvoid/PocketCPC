@@ -32,6 +32,8 @@ localparam [7:0] PS2_CTRL   = 8'h14;
 localparam [22:0] VKB_CAPS_PULSE_CYCLES = 23'd7_999_999;
 localparam [20:0] MACRO_PRESS_DELAY_CYCLES   = 21'd1_279_999; // ~20 ms @ 64 MHz
 localparam [20:0] MACRO_RELEASE_DELAY_CYCLES = 21'd255_999;   // ~4 ms  @ 64 MHz
+localparam [24:0] VKB_REPEAT_INITIAL_CYCLES  = 25'd19_199_999; // ~300 ms @ 64 MHz
+localparam [24:0] VKB_REPEAT_RATE_CYCLES     = 25'd4_479_999;  // ~70 ms  @ 64 MHz
 
 wire [15:0] buttons = cont1_key[15:0];
 wire [15:0] changed = buttons ^ buttons_prev;
@@ -62,6 +64,8 @@ reg  [5:0]  macro_step = 6'd0;
 reg         macro_release_shift = 1'b0;
 reg         macro_release_ctrl = 1'b0;
 reg  [20:0] macro_delay = 21'd0;
+reg  [1:0]  vkb_repeat_dir = 2'd0;
+reg  [24:0] vkb_repeat_timer = 25'd0;
 
 // Reuse the MiSTer CPC joystick bit ordering exactly as exposed by joydb.sv:
 // {fire3, fire2, fire1, up, down, left, right}. hid.sv performs its own final
@@ -548,6 +552,20 @@ function [6:0] vkb_clamp_index;
                 7'd72, 7'd73, 7'd74: vkb_clamp_index = 7'd71;
                 default: vkb_clamp_index = key_index;
             endcase
+        end else if (page == 2'd1) begin
+            case (key_index)
+                7'd3: vkb_clamp_index = 7'd2;
+                7'd5, 7'd6, 7'd7, 7'd8, 7'd9, 7'd10, 7'd11, 7'd12, 7'd13, 7'd14: vkb_clamp_index = 7'd4;
+                7'd21, 7'd22, 7'd23, 7'd24, 7'd25, 7'd26, 7'd27, 7'd28, 7'd29: vkb_clamp_index = 7'd20;
+                7'd33: vkb_clamp_index = 7'd32;
+                7'd35, 7'd36, 7'd37, 7'd38, 7'd39, 7'd40, 7'd41, 7'd42, 7'd43, 7'd44: vkb_clamp_index = 7'd34;
+                default: if (key_index > vkb_page_last_index(page)) vkb_clamp_index = vkb_page_last_index(page);
+            endcase
+        end else if (page == 2'd2) begin
+            case (key_index)
+                7'd6: vkb_clamp_index = 7'd5;
+                default: if (key_index > vkb_page_last_index(page)) vkb_clamp_index = vkb_page_last_index(page);
+            endcase
         end else if (key_index > vkb_page_last_index(page)) begin
             vkb_clamp_index = vkb_page_last_index(page);
         end
@@ -566,14 +584,369 @@ function [6:0] vkb_page_last_index;
     end
 endfunction
 
-function [6:0] vkb_page_last_movable_row;
+function [6:0] vkb_page_last_row_start;
     input [1:0] page;
     begin
         case (page)
-            2'd0: vkb_page_last_movable_row = 7'd59;
-            2'd1: vkb_page_last_movable_row = 7'd34;
-            2'd2: vkb_page_last_movable_row = 7'd6;
-            default: vkb_page_last_movable_row = 7'd0;
+            2'd0: vkb_page_last_row_start = 7'd60;
+            2'd1: vkb_page_last_row_start = 7'd45;
+            2'd2: vkb_page_last_row_start = 7'd15;
+            default: vkb_page_last_row_start = 7'd0;
+        endcase
+    end
+endfunction
+
+function [6:0] vkb_move_left;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_move_left = key_index;
+        case (page)
+            2'd0: begin
+                case (key_index)
+                    7'd0: vkb_move_left = 7'd14;
+                    7'd1: vkb_move_left = 7'd0;
+                    7'd2: vkb_move_left = 7'd1;
+                    7'd3: vkb_move_left = 7'd2;
+                    7'd4: vkb_move_left = 7'd3;
+                    7'd5: vkb_move_left = 7'd4;
+                    7'd6: vkb_move_left = 7'd5;
+                    7'd7: vkb_move_left = 7'd6;
+                    7'd8: vkb_move_left = 7'd7;
+                    7'd9: vkb_move_left = 7'd8;
+                    7'd10: vkb_move_left = 7'd9;
+                    7'd11: vkb_move_left = 7'd10;
+                    7'd12: vkb_move_left = 7'd11;
+                    7'd13: vkb_move_left = 7'd12;
+                    7'd14: vkb_move_left = 7'd13;
+                    7'd15: vkb_move_left = 7'd28;
+                    7'd16: vkb_move_left = 7'd15;
+                    7'd17: vkb_move_left = 7'd16;
+                    7'd18: vkb_move_left = 7'd17;
+                    7'd19: vkb_move_left = 7'd18;
+                    7'd20: vkb_move_left = 7'd19;
+                    7'd21: vkb_move_left = 7'd20;
+                    7'd22: vkb_move_left = 7'd21;
+                    7'd23: vkb_move_left = 7'd22;
+                    7'd24: vkb_move_left = 7'd23;
+                    7'd25: vkb_move_left = 7'd24;
+                    7'd26: vkb_move_left = 7'd25;
+                    7'd27: vkb_move_left = 7'd26;
+                    7'd28: vkb_move_left = 7'd27;
+                    7'd30: vkb_move_left = 7'd43;
+                    7'd31: vkb_move_left = 7'd30;
+                    7'd32: vkb_move_left = 7'd31;
+                    7'd33: vkb_move_left = 7'd32;
+                    7'd34: vkb_move_left = 7'd33;
+                    7'd35: vkb_move_left = 7'd34;
+                    7'd36: vkb_move_left = 7'd35;
+                    7'd37: vkb_move_left = 7'd36;
+                    7'd38: vkb_move_left = 7'd37;
+                    7'd39: vkb_move_left = 7'd38;
+                    7'd40: vkb_move_left = 7'd39;
+                    7'd41: vkb_move_left = 7'd40;
+                    7'd42: vkb_move_left = 7'd41;
+                    7'd43: vkb_move_left = 7'd42;
+                    7'd45: vkb_move_left = 7'd58;
+                    7'd47: vkb_move_left = 7'd45;
+                    7'd48: vkb_move_left = 7'd47;
+                    7'd49: vkb_move_left = 7'd48;
+                    7'd50: vkb_move_left = 7'd49;
+                    7'd51: vkb_move_left = 7'd50;
+                    7'd52: vkb_move_left = 7'd51;
+                    7'd53: vkb_move_left = 7'd52;
+                    7'd54: vkb_move_left = 7'd53;
+                    7'd55: vkb_move_left = 7'd54;
+                    7'd56: vkb_move_left = 7'd55;
+                    7'd57: vkb_move_left = 7'd56;
+                    7'd58: vkb_move_left = 7'd57;
+                    7'd60: vkb_move_left = 7'd71;
+                    7'd62: vkb_move_left = 7'd60;
+                    7'd64: vkb_move_left = 7'd62;
+                    7'd71: vkb_move_left = 7'd64;
+                    default: vkb_move_left = key_index;
+                endcase
+            end
+            2'd1: begin
+                case (key_index)
+                    7'd0: vkb_move_left = 7'd4;
+                    7'd1: vkb_move_left = 7'd0;
+                    7'd2: vkb_move_left = 7'd1;
+                    7'd4: vkb_move_left = 7'd2;
+                    7'd15: vkb_move_left = 7'd20;
+                    7'd16: vkb_move_left = 7'd15;
+                    7'd17: vkb_move_left = 7'd16;
+                    7'd18: vkb_move_left = 7'd17;
+                    7'd19: vkb_move_left = 7'd18;
+                    7'd20: vkb_move_left = 7'd19;
+                    7'd30: vkb_move_left = 7'd34;
+                    7'd31: vkb_move_left = 7'd30;
+                    7'd32: vkb_move_left = 7'd31;
+                    7'd34: vkb_move_left = 7'd32;
+                    7'd45: vkb_move_left = 7'd49;
+                    7'd46: vkb_move_left = 7'd45;
+                    7'd47: vkb_move_left = 7'd46;
+                    7'd48: vkb_move_left = 7'd47;
+                    7'd49: vkb_move_left = 7'd48;
+                    default: vkb_move_left = key_index;
+                endcase
+            end
+            2'd2: begin
+                case (key_index)
+                    7'd0: vkb_move_left = 7'd14;
+                    7'd1: vkb_move_left = 7'd0;
+                    7'd2: vkb_move_left = 7'd1;
+                    7'd3: vkb_move_left = 7'd2;
+                    7'd4: vkb_move_left = 7'd3;
+                    7'd5: vkb_move_left = 7'd4;
+                    7'd7: vkb_move_left = 7'd5;
+                    7'd8: vkb_move_left = 7'd7;
+                    7'd9: vkb_move_left = 7'd8;
+                    7'd10: vkb_move_left = 7'd9;
+                    7'd11: vkb_move_left = 7'd10;
+                    7'd12: vkb_move_left = 7'd11;
+                    7'd13: vkb_move_left = 7'd12;
+                    7'd14: vkb_move_left = 7'd13;
+                    7'd15: vkb_move_left = 7'd21;
+                    7'd16: vkb_move_left = 7'd15;
+                    7'd17: vkb_move_left = 7'd16;
+                    7'd18: vkb_move_left = 7'd17;
+                    7'd19: vkb_move_left = 7'd18;
+                    7'd20: vkb_move_left = 7'd19;
+                    7'd21: vkb_move_left = 7'd20;
+                    default: vkb_move_left = key_index;
+                endcase
+            end
+            2'd3: begin
+                case (key_index)
+                    7'd0: vkb_move_left = 7'd4;
+                    7'd1: vkb_move_left = 7'd0;
+                    7'd2: vkb_move_left = 7'd1;
+                    7'd3: vkb_move_left = 7'd2;
+                    7'd4: vkb_move_left = 7'd3;
+                    default: vkb_move_left = key_index;
+                endcase
+            end
+            default: vkb_move_left = key_index;
+        endcase
+    end
+endfunction
+
+function [6:0] vkb_move_right;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_move_right = key_index;
+        case (page)
+            2'd0: begin
+                case (key_index)
+                    7'd0: vkb_move_right = 7'd1;
+                    7'd1: vkb_move_right = 7'd2;
+                    7'd2: vkb_move_right = 7'd3;
+                    7'd3: vkb_move_right = 7'd4;
+                    7'd4: vkb_move_right = 7'd5;
+                    7'd5: vkb_move_right = 7'd6;
+                    7'd6: vkb_move_right = 7'd7;
+                    7'd7: vkb_move_right = 7'd8;
+                    7'd8: vkb_move_right = 7'd9;
+                    7'd9: vkb_move_right = 7'd10;
+                    7'd10: vkb_move_right = 7'd11;
+                    7'd11: vkb_move_right = 7'd12;
+                    7'd12: vkb_move_right = 7'd13;
+                    7'd13: vkb_move_right = 7'd14;
+                    7'd14: vkb_move_right = 7'd0;
+                    7'd15: vkb_move_right = 7'd16;
+                    7'd16: vkb_move_right = 7'd17;
+                    7'd17: vkb_move_right = 7'd18;
+                    7'd18: vkb_move_right = 7'd19;
+                    7'd19: vkb_move_right = 7'd20;
+                    7'd20: vkb_move_right = 7'd21;
+                    7'd21: vkb_move_right = 7'd22;
+                    7'd22: vkb_move_right = 7'd23;
+                    7'd23: vkb_move_right = 7'd24;
+                    7'd24: vkb_move_right = 7'd25;
+                    7'd25: vkb_move_right = 7'd26;
+                    7'd26: vkb_move_right = 7'd27;
+                    7'd27: vkb_move_right = 7'd28;
+                    7'd28: vkb_move_right = 7'd15;
+                    7'd30: vkb_move_right = 7'd31;
+                    7'd31: vkb_move_right = 7'd32;
+                    7'd32: vkb_move_right = 7'd33;
+                    7'd33: vkb_move_right = 7'd34;
+                    7'd34: vkb_move_right = 7'd35;
+                    7'd35: vkb_move_right = 7'd36;
+                    7'd36: vkb_move_right = 7'd37;
+                    7'd37: vkb_move_right = 7'd38;
+                    7'd38: vkb_move_right = 7'd39;
+                    7'd39: vkb_move_right = 7'd40;
+                    7'd40: vkb_move_right = 7'd41;
+                    7'd41: vkb_move_right = 7'd42;
+                    7'd42: vkb_move_right = 7'd43;
+                    7'd43: vkb_move_right = 7'd30;
+                    7'd45: vkb_move_right = 7'd47;
+                    7'd47: vkb_move_right = 7'd48;
+                    7'd48: vkb_move_right = 7'd49;
+                    7'd49: vkb_move_right = 7'd50;
+                    7'd50: vkb_move_right = 7'd51;
+                    7'd51: vkb_move_right = 7'd52;
+                    7'd52: vkb_move_right = 7'd53;
+                    7'd53: vkb_move_right = 7'd54;
+                    7'd54: vkb_move_right = 7'd55;
+                    7'd55: vkb_move_right = 7'd56;
+                    7'd56: vkb_move_right = 7'd57;
+                    7'd57: vkb_move_right = 7'd58;
+                    7'd58: vkb_move_right = 7'd45;
+                    7'd60: vkb_move_right = 7'd62;
+                    7'd62: vkb_move_right = 7'd64;
+                    7'd64: vkb_move_right = 7'd71;
+                    7'd71: vkb_move_right = 7'd60;
+                    default: vkb_move_right = key_index;
+                endcase
+            end
+            2'd1: begin
+                case (key_index)
+                    7'd0: vkb_move_right = 7'd1;
+                    7'd1: vkb_move_right = 7'd2;
+                    7'd2: vkb_move_right = 7'd4;
+                    7'd4: vkb_move_right = 7'd0;
+                    7'd15: vkb_move_right = 7'd16;
+                    7'd16: vkb_move_right = 7'd17;
+                    7'd17: vkb_move_right = 7'd18;
+                    7'd18: vkb_move_right = 7'd19;
+                    7'd19: vkb_move_right = 7'd20;
+                    7'd20: vkb_move_right = 7'd15;
+                    7'd30: vkb_move_right = 7'd31;
+                    7'd31: vkb_move_right = 7'd32;
+                    7'd32: vkb_move_right = 7'd34;
+                    7'd34: vkb_move_right = 7'd30;
+                    7'd45: vkb_move_right = 7'd46;
+                    7'd46: vkb_move_right = 7'd47;
+                    7'd47: vkb_move_right = 7'd48;
+                    7'd48: vkb_move_right = 7'd49;
+                    7'd49: vkb_move_right = 7'd45;
+                    default: vkb_move_right = key_index;
+                endcase
+            end
+            2'd2: begin
+                case (key_index)
+                    7'd0: vkb_move_right = 7'd1;
+                    7'd1: vkb_move_right = 7'd2;
+                    7'd2: vkb_move_right = 7'd3;
+                    7'd3: vkb_move_right = 7'd4;
+                    7'd4: vkb_move_right = 7'd5;
+                    7'd5: vkb_move_right = 7'd7;
+                    7'd7: vkb_move_right = 7'd8;
+                    7'd8: vkb_move_right = 7'd9;
+                    7'd9: vkb_move_right = 7'd10;
+                    7'd10: vkb_move_right = 7'd11;
+                    7'd11: vkb_move_right = 7'd12;
+                    7'd12: vkb_move_right = 7'd13;
+                    7'd13: vkb_move_right = 7'd14;
+                    7'd14: vkb_move_right = 7'd0;
+                    7'd15: vkb_move_right = 7'd16;
+                    7'd16: vkb_move_right = 7'd17;
+                    7'd17: vkb_move_right = 7'd18;
+                    7'd18: vkb_move_right = 7'd19;
+                    7'd19: vkb_move_right = 7'd20;
+                    7'd20: vkb_move_right = 7'd21;
+                    7'd21: vkb_move_right = 7'd15;
+                    default: vkb_move_right = key_index;
+                endcase
+            end
+            2'd3: begin
+                case (key_index)
+                    7'd0: vkb_move_right = 7'd1;
+                    7'd1: vkb_move_right = 7'd2;
+                    7'd2: vkb_move_right = 7'd3;
+                    7'd3: vkb_move_right = 7'd4;
+                    7'd4: vkb_move_right = 7'd0;
+                    default: vkb_move_right = key_index;
+                endcase
+            end
+            default: vkb_move_right = key_index;
+        endcase
+    end
+endfunction
+
+function [6:0] vkb_wrap_up_simple;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_wrap_up_simple = key_index;
+        case (page)
+            2'd0: begin
+                case (key_index)
+                    7'd0, 7'd1: vkb_wrap_up_simple = 7'd60;
+                    7'd2, 7'd3: vkb_wrap_up_simple = 7'd62;
+                    7'd4, 7'd5, 7'd6, 7'd7, 7'd8, 7'd9, 7'd10: vkb_wrap_up_simple = 7'd64;
+                    7'd11, 7'd12, 7'd13, 7'd14: vkb_wrap_up_simple = 7'd71;
+                    default: vkb_wrap_up_simple = key_index;
+                endcase
+            end
+            2'd1: begin
+                case (key_index)
+                    7'd0: vkb_wrap_up_simple = 7'd45;
+                    7'd1: vkb_wrap_up_simple = 7'd46;
+                    7'd2: vkb_wrap_up_simple = 7'd47;
+                    7'd4: vkb_wrap_up_simple = 7'd49;
+                    default: vkb_wrap_up_simple = key_index;
+                endcase
+            end
+            2'd2: begin
+                case (key_index)
+                    7'd0: vkb_wrap_up_simple = 7'd15;
+                    7'd1: vkb_wrap_up_simple = 7'd16;
+                    7'd2: vkb_wrap_up_simple = 7'd17;
+                    7'd3: vkb_wrap_up_simple = 7'd18;
+                    7'd4: vkb_wrap_up_simple = 7'd19;
+                    7'd5: vkb_wrap_up_simple = 7'd20;
+                    7'd7, 7'd8, 7'd9, 7'd10, 7'd11, 7'd12, 7'd13, 7'd14: vkb_wrap_up_simple = 7'd21;
+                    default: vkb_wrap_up_simple = key_index;
+                endcase
+            end
+            default: vkb_wrap_up_simple = key_index;
+        endcase
+    end
+endfunction
+
+function [6:0] vkb_wrap_down_simple;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        vkb_wrap_down_simple = key_index;
+        case (page)
+            2'd0: begin
+                case (key_index)
+                    7'd60: vkb_wrap_down_simple = 7'd0;
+                    7'd62: vkb_wrap_down_simple = 7'd2;
+                    7'd64: vkb_wrap_down_simple = 7'd4;
+                    7'd71: vkb_wrap_down_simple = 7'd11;
+                    default: vkb_wrap_down_simple = key_index;
+                endcase
+            end
+            2'd1: begin
+                case (key_index)
+                    7'd45: vkb_wrap_down_simple = 7'd0;
+                    7'd46: vkb_wrap_down_simple = 7'd1;
+                    7'd47: vkb_wrap_down_simple = 7'd2;
+                    7'd48: vkb_wrap_down_simple = 7'd2;
+                    7'd49: vkb_wrap_down_simple = 7'd4;
+                    default: vkb_wrap_down_simple = key_index;
+                endcase
+            end
+            2'd2: begin
+                case (key_index)
+                    7'd15: vkb_wrap_down_simple = 7'd0;
+                    7'd16: vkb_wrap_down_simple = 7'd1;
+                    7'd17: vkb_wrap_down_simple = 7'd2;
+                    7'd18: vkb_wrap_down_simple = 7'd3;
+                    7'd19: vkb_wrap_down_simple = 7'd4;
+                    7'd20: vkb_wrap_down_simple = 7'd5;
+                    7'd21: vkb_wrap_down_simple = 7'd5;
+                    default: vkb_wrap_down_simple = key_index;
+                endcase
+            end
+            default: vkb_wrap_down_simple = key_index;
         endcase
     end
 endfunction
@@ -591,6 +964,27 @@ wire [9:0] dock_active_ps2 = map_usb_hid_to_ps2(dock_active_code);
 wire [9:0] dock_report_ps2 = map_usb_hid_to_ps2(dock_report_code);
 wire [1:0] macro_prelude_len = {1'b0, macro_release_ctrl} + {1'b0, macro_release_shift};
 wire [5:0] macro_total_len = macro_body_len(macro_id) + {4'd0, macro_prelude_len};
+wire [3:0] vkb_held_dirs = buttons[3:0];
+wire       vkb_repeat_single_dir = (vkb_held_dirs == 4'b0001) ||
+                                   (vkb_held_dirs == 4'b0010) ||
+                                   (vkb_held_dirs == 4'b0100) ||
+                                   (vkb_held_dirs == 4'b1000);
+wire [1:0] vkb_repeat_candidate_dir =
+    vkb_held_dirs[0] ? 2'd0 :
+    vkb_held_dirs[1] ? 2'd1 :
+    vkb_held_dirs[2] ? 2'd2 :
+                       2'd3;
+wire       vkb_repeat_current_dir_held =
+    ((vkb_repeat_dir == 2'd0) && vkb_held_dirs[0]) ||
+    ((vkb_repeat_dir == 2'd1) && vkb_held_dirs[1]) ||
+    ((vkb_repeat_dir == 2'd2) && vkb_held_dirs[2]) ||
+    ((vkb_repeat_dir == 2'd3) && vkb_held_dirs[3]);
+wire       vkb_repeat_fire = vkb_active && !macro_active && vkb_repeat_single_dir &&
+                             vkb_repeat_current_dir_held && (vkb_repeat_timer == 25'd0);
+wire       vkb_nav_up = pressed[0] || (vkb_repeat_fire && (vkb_repeat_dir == 2'd0));
+wire       vkb_nav_down = pressed[1] || (vkb_repeat_fire && (vkb_repeat_dir == 2'd1));
+wire       vkb_nav_left = pressed[2] || (vkb_repeat_fire && (vkb_repeat_dir == 2'd2));
+wire       vkb_nav_right = pressed[3] || (vkb_repeat_fire && (vkb_repeat_dir == 2'd3));
 reg  [10:0] macro_ps2_event;
 reg         macro_ps2_valid;
 reg  [5:0]  macro_body_step;
@@ -682,6 +1076,8 @@ always @(posedge clk) begin
         macro_release_shift <= 1'b0;
         macro_release_ctrl <= 1'b0;
         macro_delay <= 21'd0;
+        vkb_repeat_dir <= 2'd0;
+        vkb_repeat_timer <= 25'd0;
     end else begin
         buttons_prev <= buttons;
         pending      <= next_pending;
@@ -703,10 +1099,34 @@ always @(posedge clk) begin
                 macro_release_shift <= 1'b0;
                 macro_release_ctrl <= 1'b0;
                 macro_delay <= 21'd0;
+                vkb_repeat_timer <= 25'd0;
                 if (vkb_active && vkb_shift) begin
                     vkb_shift <= 1'b0;
                     ps2_key <= {~ps2_key[10], 1'b0, 1'b0, PS2_LSHIFT};
                 end
+            end
+
+            if (!vkb_active || macro_active || !vkb_repeat_single_dir) begin
+                vkb_repeat_timer <= 25'd0;
+            end else if (pressed[0]) begin
+                vkb_repeat_dir <= 2'd0;
+                vkb_repeat_timer <= VKB_REPEAT_INITIAL_CYCLES;
+            end else if (pressed[1]) begin
+                vkb_repeat_dir <= 2'd1;
+                vkb_repeat_timer <= VKB_REPEAT_INITIAL_CYCLES;
+            end else if (pressed[2]) begin
+                vkb_repeat_dir <= 2'd2;
+                vkb_repeat_timer <= VKB_REPEAT_INITIAL_CYCLES;
+            end else if (pressed[3]) begin
+                vkb_repeat_dir <= 2'd3;
+                vkb_repeat_timer <= VKB_REPEAT_INITIAL_CYCLES;
+            end else if (!vkb_repeat_current_dir_held) begin
+                vkb_repeat_dir <= vkb_repeat_candidate_dir;
+                vkb_repeat_timer <= VKB_REPEAT_INITIAL_CYCLES;
+            end else if (vkb_repeat_timer != 25'd0) begin
+                vkb_repeat_timer <= vkb_repeat_timer - 25'd1;
+            end else begin
+                vkb_repeat_timer <= VKB_REPEAT_RATE_CYCLES;
             end
 
             if (vkb_active && !macro_active) begin
@@ -746,31 +1166,16 @@ always @(posedge clk) begin
                     vkb_index <= 7'd0;
                 end
 
-                if (pressed[0] && (vkb_index >= 7'd15)) vkb_index <= vkb_clamp_index(vkb_index - 7'd15, vkb_page);
-                if (pressed[1] && (vkb_index <= vkb_page_last_movable_row(vkb_page))) vkb_index <= vkb_clamp_index(vkb_index + 7'd15, vkb_page);
-                if (pressed[2]) begin
-                    if (vkb_index == 7'd0) vkb_index <= vkb_page_last_index(vkb_page);
-                    else if (vkb_index == 7'd15) vkb_index <= vkb_clamp_index(7'd29, vkb_page);
-                    else if (vkb_index == 7'd30) vkb_index <= vkb_clamp_index(7'd44, vkb_page);
-                    else if (vkb_index == 7'd45) vkb_index <= vkb_clamp_index(7'd59, vkb_page);
-                    else if (vkb_index == 7'd60) vkb_index <= vkb_clamp_index(vkb_page_last_index(vkb_page), vkb_page);
-                    else vkb_index <= vkb_clamp_index(vkb_index - 6'd1, vkb_page);
+                if (vkb_nav_up) begin
+                    if (vkb_index < 7'd15) vkb_index <= vkb_wrap_up_simple(vkb_index, vkb_page);
+                    else vkb_index <= vkb_clamp_index(vkb_index - 7'd15, vkb_page);
                 end
-                if (pressed[3]) begin
-                    if (vkb_index == vkb_page_last_index(vkb_page)) vkb_index <= 7'd0;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd28)) vkb_index <= 7'd15;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd43)) vkb_index <= 7'd30;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd45)) vkb_index <= 7'd47;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd58)) vkb_index <= 7'd45;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd60)) vkb_index <= 7'd62;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd62)) vkb_index <= 7'd64;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd64)) vkb_index <= 7'd71;
-                    else if ((vkb_page == 2'd0) && (vkb_index == 7'd71)) vkb_index <= 7'd60;
-                    else if (vkb_index == 7'd29) vkb_index <= 7'd15;
-                    else if (vkb_index == 7'd44) vkb_index <= 7'd30;
-                    else if (vkb_index == 7'd59) vkb_index <= 7'd45;
-                    else vkb_index <= vkb_clamp_index(vkb_index + 6'd1, vkb_page);
+                if (vkb_nav_down) begin
+                    if (vkb_index >= vkb_page_last_row_start(vkb_page)) vkb_index <= vkb_wrap_down_simple(vkb_index, vkb_page);
+                    else vkb_index <= vkb_clamp_index(vkb_index + 7'd15, vkb_page);
                 end
+                if (vkb_nav_left) vkb_index <= vkb_move_left(vkb_index, vkb_page);
+                if (vkb_nav_right) vkb_index <= vkb_move_right(vkb_index, vkb_page);
             end
 
             if (macro_active && (macro_delay != 21'd0)) begin
