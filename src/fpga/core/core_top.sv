@@ -583,6 +583,15 @@ localparam integer CPC_RASTER_DEFAULT_LEFT     = 36;
 localparam integer CPC_RASTER_DEFAULT_RIGHT    = 732;
 localparam integer CPC_RASTER_DEFAULT_TOP      = 28;
 localparam integer CPC_RASTER_DEFAULT_BOTTOM   = 252;
+localparam integer CPC_VKB_OVERLAY_W           = 600;
+localparam integer CPC_VKB_OVERLAY_MARGIN_X    = 0;
+localparam integer CPC_VKB_OVERLAY_MARGIN_Y    = 0;
+localparam integer CPC_VKB_NATIVE_X            = CPC_RASTER_OVERSCAN_WIDTH - CPC_VKB_OVERLAY_W - CPC_VKB_OVERLAY_MARGIN_X;
+localparam integer CPC_VKB_NATIVE_Y            = CPC_VKB_OVERLAY_MARGIN_Y;
+localparam integer CPC_VKB_DEFAULT_X           = CPC_RASTER_DEFAULT_WIDTH - CPC_VKB_OVERLAY_W - CPC_VKB_OVERLAY_MARGIN_X;
+localparam integer CPC_VKB_DEFAULT_Y           = CPC_VKB_OVERLAY_MARGIN_Y;
+localparam integer CPC_VKB_TIGHT_X             = CPC_RASTER_TIGHT_WIDTH - CPC_VKB_OVERLAY_W - CPC_VKB_OVERLAY_MARGIN_X;
+localparam integer CPC_VKB_TIGHT_Y             = CPC_VKB_OVERLAY_MARGIN_Y;
 localparam integer CPC_ACTIVITY_INDICATOR_X    = 8;
 localparam integer CPC_ACTIVITY_INDICATOR_Y    = 10;
 localparam integer CPC_ACTIVITY_INDICATOR_W    = 14;
@@ -651,6 +660,10 @@ wire [23:0] cpc_zoom_rgb;
 wire [23:0] cpc_video_slot_rgb;
 wire        cpc_display_mode_bit0;
 wire        cpc_display_mode_bit1;
+wire [9:0]  cpc_vkb_zoom_x =
+    (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? CPC_VKB_TIGHT_X[9:0] : CPC_VKB_DEFAULT_X[9:0];
+wire [8:0]  cpc_vkb_zoom_y =
+    (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? CPC_VKB_TIGHT_Y[8:0] : CPC_VKB_DEFAULT_Y[8:0];
 wire        cpc_activity_indicator_enable = interact_config_cpc[2];
 wire        cpc_disk_sound_enable = interact_config_cpc[3];
 wire        cpc_disk_activity_raw;
@@ -976,6 +989,8 @@ cpc_virtual_keyboard_overlay cpc_vkb_native_overlay (
     .de             ( cpc_native_de ),
     .vs             ( cpc_native_vs ),
     .rgb_in         ( cpc_native_rgb ),
+    .origin_x       ( CPC_VKB_NATIVE_X[9:0] ),
+    .origin_y       ( CPC_VKB_NATIVE_Y[8:0] ),
     .active         ( cpc_vkb_active & cpc_rom_loaded & ~cpc_zoom_selected ),
     .selected_index ( cpc_vkb_index ),
     .page           ( cpc_vkb_page ),
@@ -986,16 +1001,15 @@ cpc_virtual_keyboard_overlay cpc_vkb_native_overlay (
     .overlay_on     ( cpc_overlay_native_on )
 );
 
-cpc_virtual_keyboard_overlay #(
-    .X0(10'd20),
-    .Y0(9'd112)
-) cpc_vkb_zoom_overlay (
+cpc_virtual_keyboard_overlay cpc_vkb_zoom_overlay (
     .clk            ( cpc_clk ),
     .reset_n        ( cpc_reset_n ),
     .ce             ( cpc_apf_ce ),
     .de             ( cpc_zoom_visible ),
     .vs             ( cpc_native_vs ),
     .rgb_in         ( cpc_zoom_rgb ),
+    .origin_x       ( cpc_vkb_zoom_x ),
+    .origin_y       ( cpc_vkb_zoom_y ),
     .active         ( cpc_vkb_active & cpc_rom_loaded & cpc_zoom_selected ),
     .selected_index ( cpc_vkb_index ),
     .page           ( cpc_vkb_page ),

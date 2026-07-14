@@ -2,16 +2,15 @@
 
 `default_nettype none
 
-module cpc_virtual_keyboard_overlay #(
-    parameter [9:0] X0 = 10'd84,
-    parameter [8:0] Y0 = 9'd152
-) (
+module cpc_virtual_keyboard_overlay (
     input  wire        clk,
     input  wire        reset_n,
     input  wire        ce,
     input  wire        de,
     input  wire        vs,
     input  wire [23:0] rgb_in,
+    input  wire [9:0]  origin_x,
+    input  wire [8:0]  origin_y,
     input  wire        active,
     input  wire [6:0]  selected_index,
     input  wire [1:0]  page,
@@ -23,17 +22,17 @@ module cpc_virtual_keyboard_overlay #(
 );
 
 localparam [9:0] KEY_W = 10'd40;
-localparam [9:0] X1    = X0 + 10'd600;
-localparam [8:0] Y1    = Y0 + 9'd80;
+wire [9:0] x1 = origin_x + 10'd600;
+wire [8:0] y1 = origin_y + 9'd80;
 
 reg [9:0] x = 10'd0;
 reg [8:0] y = 9'd0;
 reg       de_prev = 1'b0;
 reg       vs_prev = 1'b0;
 
-wire       in_band = active && de && (x >= X0) && (x < X1) && (y >= Y0) && (y < Y1);
-wire [9:0] band_x  = x - X0;
-wire [8:0] band_y  = y - Y0;
+wire       in_band = active && de && (x >= origin_x) && (x < x1) && (y >= origin_y) && (y < y1);
+wire [9:0] band_x  = x - origin_x;
+wire [8:0] band_y  = y - origin_y;
 wire [2:0] key_row = band_y[6:4];
 
 function [3:0] band_x_to_col;
@@ -698,6 +697,7 @@ always @(posedge clk) begin
             if (!de_prev) x <= 10'd0;
             else x <= x + 10'd1;
         end else if (de_prev) begin
+            x <= 10'd0;
             y <= y + 9'd1;
         end
 
