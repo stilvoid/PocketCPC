@@ -478,6 +478,7 @@ cpc_machine_pocket cpc_machine (
     .loader_data     ( cpc_loader_data ),
     .loader_done     ( cpc_loader_done ),
     .loader_error    ( cpc_loader_error ),
+    .stereo_mix_enable ( cpc_stereo_mix_enable ),
     .capture_ram_rd ( cpc_capture_ram_rd ),
     .capture_ram_word_addr ( cpc_capture_ram_word_addr ),
     .capture_ram_word_data ( cpc_capture_ram_word_data ),
@@ -666,6 +667,7 @@ wire [8:0]  cpc_vkb_zoom_y =
     (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? CPC_VKB_TIGHT_Y[8:0] : CPC_VKB_DEFAULT_Y[8:0];
 wire        cpc_activity_indicator_enable = interact_config_cpc[2];
 wire        cpc_disk_sound_enable = interact_config_cpc[3];
+wire        cpc_stereo_mix_enable = interact_config_cpc[4];
 wire        cpc_disk_activity_raw;
 wire        cpc_tape_activity_raw;
 wire        cpc_media_activity_raw;

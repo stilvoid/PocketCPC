@@ -67,6 +67,7 @@ The Pocket menu's `Core Settings` entries do this:
 - `Display Framing`: choose `Default`, `Tight`, or `Overscan`
 - `Activity Indicator`: show or hide the disk activity overlay
 - `Disk Access Sound`: enable or disable drive access sound effects
+- `Stereo Mix`: enable or disable the default 25% stereo crossfeed
 - `Restart Core`: reboot the CPC after changing media or settings
 
 ### Load software

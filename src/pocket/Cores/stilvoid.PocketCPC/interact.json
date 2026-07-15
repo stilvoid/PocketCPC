@@ -58,6 +58,17 @@
         "mask": "0xFFFFFFF7",
         "defaultval": 0,
         "value": "0x00000008"
+      },
+      {
+        "name": "Stereo Mix",
+        "id": 5,
+        "type": "check",
+        "enabled": true,
+        "persist": true,
+        "address": "0x00000034",
+        "mask": "0xFFFFFFEF",
+        "defaultval": 1,
+        "value": "0x00000010"
       }
     ]
   }

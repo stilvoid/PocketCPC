@@ -28,6 +28,7 @@ module cpc_machine_pocket (
     input  wire [7:0]  loader_data,
     input  wire        loader_done,
     input  wire        loader_error,
+    input  wire        stereo_mix_enable,
     input  wire        capture_ram_rd,
     input  wire [15:0] capture_ram_word_addr,
     output wire [15:0] capture_ram_word_data,
@@ -183,6 +184,8 @@ wire [8:0]  audio_mix_r = {1'b0, audio_r} + tape_mix;
 // dense passages fold over audibly instead of just getting louder.
 wire [7:0]  audio_mix_l_sat = (audio_mix_l > 9'd127) ? 8'h7f : audio_mix_l[7:0];
 wire [7:0]  audio_mix_r_sat = (audio_mix_r > 9'd127) ? 8'h7f : audio_mix_r[7:0];
+wire [9:0]  audio_mix_l_crossfeed = {2'b00, audio_mix_l_sat} - {4'b0000, audio_mix_l_sat[7:2]} + {4'b0000, audio_mix_r_sat[7:2]};
+wire [9:0]  audio_mix_r_crossfeed = {2'b00, audio_mix_r_sat} - {4'b0000, audio_mix_r_sat[7:2]} + {4'b0000, audio_mix_l_sat[7:2]};
 
 cpc_ram_rom memory (
     .clk          ( clk ),
@@ -344,8 +347,8 @@ always @(posedge clk) begin
         ce_u765  <= !u765_div[2:0];
 
         if (ce_16) begin
-            audio_left_r  <= audio_mix_l_sat;
-            audio_right_r <= audio_mix_r_sat;
+            audio_left_r  <= stereo_mix_enable ? audio_mix_l_crossfeed[7:0] : audio_mix_l_sat;
+            audio_right_r <= stereo_mix_enable ? audio_mix_r_crossfeed[7:0] : audio_mix_r_sat;
         end
     end
 end
