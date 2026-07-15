@@ -732,15 +732,16 @@ always @(posedge cpc_clk) begin
         cpc_apf_pixel_clk <= 1'b0;
         cpc_apf_pixel_clk_90 <= 1'b0;
     end else begin
-        // Keep the APF-side pixel enable and capture clocks on the same phase
-        // generator that drives the imported CPC machine. A separate free-
-        // running divider can sample the first visible line on the wrong
-        // quarter-cycle after reset or warm starts.
-        if (cpc_div == 2'd1) cpc_apf_pixel_clk <= 1'b1;
-        if (cpc_div == 2'd3) cpc_apf_pixel_clk <= 1'b0;
+        // Match the ZX Pocket timing pattern: the APF pixel clock edge that
+        // launches the DDR word should line up with the same 16 MHz phase that
+        // advances the CPC video registers, with the scaler clock then 90
+        // degrees later. Shifting both clocks a quarter-cycle late leaves the
+        // scaler reconstructing colour components from adjacent pixels.
+        if (cpc_div == 2'd0) cpc_apf_pixel_clk <= 1'b1;
+        if (cpc_div == 2'd2) cpc_apf_pixel_clk <= 1'b0;
 
-        if (cpc_div == 2'd2) cpc_apf_pixel_clk_90 <= 1'b1;
-        if (cpc_div == 2'd0) cpc_apf_pixel_clk_90 <= 1'b0;
+        if (cpc_div == 2'd1) cpc_apf_pixel_clk_90 <= 1'b1;
+        if (cpc_div == 2'd3) cpc_apf_pixel_clk_90 <= 1'b0;
     end
 end
 
