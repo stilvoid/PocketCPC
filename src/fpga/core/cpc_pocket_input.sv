@@ -296,8 +296,10 @@ function automatic [9:0] map_usb_hid_to_ps2;
             8'h2F: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h54}; // [
             8'h30: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h5B}; // ]
             8'h31: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h5D}; // backslash
+            8'h32: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h5D}; // non-US hash/tilde -> CPC ]
             8'h33: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h4C}; // ;
             8'h34: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h52}; // quote
+            8'h35: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h61}; // grave -> CPC backslash on ANSI layouts
             8'h36: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h41}; // ,
             8'h37: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h49}; // .
             8'h38: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h4A}; // /
@@ -312,11 +314,29 @@ function automatic [9:0] map_usb_hid_to_ps2;
             8'h41: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h0A}; // F8
             8'h42: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h01}; // F9
             8'h43: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h09}; // F10 -> CPC F0
+            8'h49: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h70}; // Insert -> COPY
             8'h4C: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h71}; // Delete
             8'h4F: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h74}; // Right
             8'h50: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h6B}; // Left
             8'h51: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h72}; // Down
             8'h52: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h75}; // Up
+            8'h54: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h4A}; // keypad / -> CPC keypad /
+            8'h55: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h7C}; // keypad * -> CPC keypad *
+            8'h56: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h7B}; // keypad - -> CPC keypad -
+            8'h57: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h79}; // keypad + -> CPC keypad +
+            8'h58: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h69}; // keypad Enter -> CPC Enter
+            8'h59: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h69}; // keypad 1 -> CPC F1
+            8'h5A: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h72}; // keypad 2 -> CPC F2
+            8'h5B: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h7A}; // keypad 3 -> CPC F3
+            8'h5C: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h6B}; // keypad 4 -> CPC F4
+            8'h5D: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h73}; // keypad 5 -> CPC F5
+            8'h5E: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h74}; // keypad 6 -> CPC F6
+            8'h5F: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h6C}; // keypad 7 -> CPC F7
+            8'h60: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h75}; // keypad 8 -> CPC F8
+            8'h61: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h7D}; // keypad 9 -> CPC F9
+            8'h62: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h70}; // keypad 0 -> CPC F0
+            8'h63: map_usb_hid_to_ps2 = {1'b1, 1'b1, 8'h7A}; // keypad . -> CPC FDot
+            8'h64: map_usb_hid_to_ps2 = {1'b1, 1'b0, 8'h61}; // Non-US backslash -> CPC backslash on ISO layouts
             default: map_usb_hid_to_ps2 = 10'd0;
         endcase
     end
@@ -329,8 +349,10 @@ function automatic [9:0] map_dock_modifier_to_ps2;
         case (mod_index)
             3'd0: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};   // Left Ctrl
             3'd1: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Left Shift
+            3'd2: map_dock_modifier_to_ps2 = {1'b1, 1'b0, 8'h11};      // Left Alt
             3'd4: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_CTRL};   // Right Ctrl
             3'd5: map_dock_modifier_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // Right Shift
+            3'd6: map_dock_modifier_to_ps2 = {1'b1, 1'b1, 8'h70};      // Right Alt -> COPY fallback for compact layouts
             default: map_dock_modifier_to_ps2 = 10'd0;
         endcase
     end

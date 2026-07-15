@@ -5,10 +5,13 @@ release candidate.
 
 ## Near-Term
 
-1. Complete Dock USB keyboard coverage
-   - A few CPC-specific keys are still missing from the USB keyboard mapping.
-   - `COPY` is the most obvious current gap and should get a sensible default.
-   - After that, audit the remaining CPC-only keys and document the final map.
+1. Hardware-validate the Dock USB keyboard map
+   - The current map now covers CPC-specific keys including `COPY`, keypad
+     `Enter`, and `FDot`, with a compact-keyboard `Right Alt -> COPY` fallback.
+   - Validate the ANSI grave and ISO non-US backslash choices for the CPC
+     backslash key on real Dock hardware.
+   - Keep docs honest if any keyboard-layout-specific compromises turn out to
+     need adjustment.
 
 2. Review the default Pocket button bindings
    - The current defaults work, but they need another pass for better

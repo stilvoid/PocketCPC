@@ -601,8 +601,11 @@ This is a good local example of an adapter module:
 Dock USB keyboard support is present but still experimental:
 
 - most common typing keys and modifiers work
-- some CPC-specific keys are still unmapped
-- `COPY` is the most obvious current gap
+- `Insert` maps to CPC `COPY`, with `Right Alt` as the compact-keyboard fallback
+- main `Enter` stays CPC `Return`; keypad keys follow the CPC keypad layout,
+  including keypad `Enter` -> CPC `Enter` and keypad `.` -> `FDot`
+- ISO/UK `#~` maps to CPC `]`
+- ANSI grave and ISO non-US backslash provide the CPC backslash key
 
 ### Virtual keyboard
 

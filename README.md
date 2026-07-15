@@ -134,8 +134,10 @@ The VKB includes a shortcut page with one-tap macros for:
 - `RUN"DISC` + `Return`
 
 Dock USB keyboard support is available through the Analogue Dock, but it is
-still experimental. Most common typing keys and modifiers work, but some
-CPC-specific mappings are still incomplete, including `COPY`.
+still experimental. Most common typing keys and modifiers work, including
+`COPY` on `Insert` with a `Right Alt` fallback for compact keyboards. Numpad
+keys follow the CPC keypad layout, including numpad `Enter` -> CPC `Enter` and
+numpad `.` -> `FDot`. On ISO/UK layouts, the `#~` key maps to CPC `]`.
 
 ## Current Limitations
 
