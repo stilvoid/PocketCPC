@@ -216,6 +216,7 @@ assign aux_scl   = 1'bz;
 assign vpll_feed = 1'b0;
 
 wire cpc_clk;
+wire cpc_pll_rst = !core_reset_n;
 wire cpc_pll_locked;
 wire cpc_pll_locked_74;
 reg  cpc_pll_ready_74 = 1'b0;
@@ -229,7 +230,7 @@ reg [15:0] host_reset_low_count  = 16'd0;
 
 cpc_pll cpc_pll_inst (
     .refclk   ( clk_74a ),
-    .rst      ( 1'b0 ),
+    .rst      ( cpc_pll_rst ),
     .outclk_0 ( cpc_clk ),
     .locked   ( cpc_pll_locked )
 );
@@ -307,9 +308,6 @@ wire        cpc_rgb_hsync;
 wire        cpc_rgb_vsync;
 wire        cpc_rgb_hblank;
 wire        cpc_rgb_vblank;
-wire        cpc_crtc_hsync;
-wire        cpc_crtc_vsync;
-wire        cpc_crtc_de;
 wire        cpc_video_de;
 wire        cpc_video_phase_n;
 wire        cpc_video_phase_p;
@@ -544,9 +542,9 @@ cpc_machine_pocket cpc_machine (
     .rgb_vsync       ( cpc_rgb_vsync ),
     .rgb_hblank      ( cpc_rgb_hblank ),
     .rgb_vblank      ( cpc_rgb_vblank ),
-    .crtc_hsync      ( cpc_crtc_hsync ),
-    .crtc_vsync      ( cpc_crtc_vsync ),
-    .crtc_de         ( cpc_crtc_de ),
+    .crtc_hsync      ( ),
+    .crtc_vsync      ( ),
+    .crtc_de         ( ),
     .video_de        ( cpc_video_de ),
     .video_phase_n   ( cpc_video_phase_n ),
     .video_phase_p   ( cpc_video_phase_p ),
@@ -653,17 +651,10 @@ reg       cpc_zoom_de_prev = 1'b0;
 reg       cpc_raster_de_prev = 1'b0;
 reg [9:0] cpc_raster_x = 10'd0;
 reg [8:0] cpc_raster_y = 9'd0;
-reg [23:0] cpc_playfield_rgb = 24'h000000;
-reg       cpc_playfield_de = 1'b0;
-reg       cpc_playfield_hs = 1'b0;
-reg       cpc_playfield_vs = 1'b0;
 reg [23:0] cpc_tight_rgb = 24'h000000;
 reg       cpc_tight_de = 1'b0;
 reg [23:0] cpc_default_rgb = 24'h000000;
 reg       cpc_default_de = 1'b0;
-reg       cpc_crtc_hsync_prev = 1'b0;
-reg       cpc_crtc_vsync_prev = 1'b0;
-reg [2:0] cpc_crtc_hsync_delay = 3'd0;
 wire [23:0] cpc_overlay_native_rgb;
 wire [23:0] cpc_overlay_zoom_rgb;
 wire        cpc_overlay_native_on;
@@ -728,7 +719,6 @@ reg         cpc_disk_activity_raw_d = 1'b0;
 reg         cpc_sd_ack_d = 1'b0;
 reg  [17:0] cpc_disk_click_count = 18'd0;
 wire        cpc_media_activity_visible = (cpc_media_activity_hold != 23'd0);
-wire        cpc_disk_activity_visible = (cpc_disk_activity_hold != 23'd0);
 wire        cpc_disk_click_trigger =
     (cpc_disk_activity_raw && !cpc_disk_activity_raw_d) ||
     (cpc_sd_ack && !cpc_sd_ack_d);
@@ -829,23 +819,13 @@ always @(posedge cpc_clk) begin
         cpc_raster_de_prev <= 1'b0;
         cpc_raster_x <= 10'd0;
         cpc_raster_y <= 9'd0;
-        cpc_playfield_rgb <= 24'h000000;
-        cpc_playfield_de <= 1'b0;
-        cpc_playfield_hs <= 1'b0;
-        cpc_playfield_vs <= 1'b0;
         cpc_tight_rgb <= 24'h000000;
         cpc_tight_de <= 1'b0;
         cpc_default_rgb <= 24'h000000;
         cpc_default_de <= 1'b0;
-        cpc_crtc_hsync_prev <= 1'b0;
-        cpc_crtc_vsync_prev <= 1'b0;
-        cpc_crtc_hsync_delay <= 3'd0;
     end else if (cpc_apf_ce) begin
         cpc_native_de <= 1'b0;
         cpc_native_hs <= 1'b0;
-        cpc_playfield_de <= 1'b0;
-        cpc_playfield_hs <= 1'b0;
-        cpc_playfield_rgb <= 24'h000000;
         cpc_tight_de <= 1'b0;
         cpc_tight_rgb <= 24'h000000;
         cpc_default_de <= 1'b0;
@@ -854,11 +834,6 @@ always @(posedge cpc_clk) begin
         if (cpc_raster_de_now && (cpc_raster_y >= CPC_RASTER_OVERSCAN_TOP[8:0])) begin
             cpc_native_de <= 1'b1;
             cpc_native_rgb <= cpc_rgb;
-        end
-
-        if (cpc_crtc_de) begin
-            cpc_playfield_de <= 1'b1;
-            cpc_playfield_rgb <= cpc_rgb;
         end
 
         if (cpc_raster_de_now) begin
@@ -900,28 +875,13 @@ always @(posedge cpc_clk) begin
             cpc_hsync_delay <= CPC_NATIVE_HSYNC_DELAY[2:0];
         end
 
-        if (cpc_crtc_hsync_delay != 3'd0) begin
-            cpc_crtc_hsync_delay <= cpc_crtc_hsync_delay - 3'd1;
-        end
-
-        if (cpc_crtc_hsync_delay == 3'd1) begin
-            cpc_playfield_hs <= 1'b1;
-        end
-
-        if (!cpc_crtc_hsync_prev && cpc_crtc_hsync) begin
-            cpc_crtc_hsync_delay <= CPC_PLAYFIELD_HSYNC_DELAY[2:0];
-        end
-
         cpc_native_vs <= !cpc_vsync_prev && cpc_rgb_vsync;
-        cpc_playfield_vs <= !cpc_crtc_vsync_prev && cpc_crtc_vsync;
         if (!cpc_vsync_prev && cpc_rgb_vsync) begin
             cpc_raster_x <= 10'd0;
             cpc_raster_y <= 9'd0;
         end
         cpc_hsync_prev <= cpc_rgb_hsync;
         cpc_vsync_prev <= cpc_rgb_vsync;
-        cpc_crtc_hsync_prev <= cpc_crtc_hsync;
-        cpc_crtc_vsync_prev <= cpc_crtc_vsync;
         cpc_raster_de_prev <= cpc_raster_de_now;
         cpc_zoom_de_prev <=
             (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_de :
@@ -1149,7 +1109,10 @@ sync_fifo #(
 );
 
 always @(posedge audio_mclk) begin
-    if (cpc_audio_sample_mclk_strobe) begin
+    if (!cpc_audio_pll_locked) begin
+        cpc_audio_l_mclk <= 16'd0;
+        cpc_audio_r_mclk <= 16'd0;
+    end else if (cpc_audio_sample_mclk_strobe) begin
         cpc_audio_l_mclk <= cpc_audio_sample_mclk[31:16];
         cpc_audio_r_mclk <= cpc_audio_sample_mclk[15:0];
     end

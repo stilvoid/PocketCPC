@@ -74,7 +74,6 @@ reg [6:0] bram_rd_addr = 7'd0;
 reg [3:0] write_ack_count = 4'd0;
 reg [23:0] settle_count = 24'd0;
 reg        runtime_ready = 1'b0;
-reg [31:0] drive_size [0:1];
 reg [31:0] pending_size [0:1];
 reg [1:0]  pending_mount = 2'b00;
 reg [3:0]  mount_pulse [0:1];
@@ -108,8 +107,6 @@ always @(posedge clk or negedge reset_n) begin
         write_ack_count            <= 4'd0;
         settle_count               <= 24'd0;
         runtime_ready              <= 1'b0;
-        drive_size[0]              <= 32'd0;
-        drive_size[1]              <= 32'd0;
         pending_size[0]            <= 32'd0;
         pending_size[1]            <= 32'd0;
         pending_mount              <= 2'b00;
@@ -157,13 +154,11 @@ always @(posedge clk or negedge reset_n) begin
         end
 
         if (runtime_ready && pending_mount[0]) begin
-            drive_size[0]   <= pending_size[0];
             ready[0]        <= |pending_size[0];
             img_size        <= pending_size[0];
             mount_pulse[0]  <= 4'hf;
             pending_mount[0] <= 1'b0;
         end else if (runtime_ready && pending_mount[1]) begin
-            drive_size[1]   <= pending_size[1];
             ready[1]        <= |pending_size[1];
             img_size        <= pending_size[1];
             mount_pulse[1]  <= 4'hf;

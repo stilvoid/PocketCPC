@@ -155,6 +155,10 @@ endfunction
 
 function automatic [7:0] save_path_byte;
     input [7:0] index;
+    input [31:0] rtc_date_bcd_arg;
+    input [31:0] rtc_time_bcd_arg;
+    input        rtc_valid_arg;
+    input [7:0]  save_sequence_arg;
     begin
         case (index)
             8'd0:  save_path_byte = "/";
@@ -183,24 +187,24 @@ function automatic [7:0] save_path_byte;
             8'd23: save_path_byte = "p";
             8'd24: save_path_byte = "c";
             8'd25: save_path_byte = "_";
-            8'd26: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[31:28]) : "0";
-            8'd27: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[27:24]) : "0";
-            8'd28: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[23:20]) : "0";
-            8'd29: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[19:16]) : "0";
-            8'd30: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[15:12]) : "0";
-            8'd31: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[11:8]) : "0";
-            8'd32: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[7:4]) : "0";
-            8'd33: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_date_bcd[3:0]) : "0";
+            8'd26: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[31:28]) : "0";
+            8'd27: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[27:24]) : "0";
+            8'd28: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[23:20]) : "0";
+            8'd29: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[19:16]) : "0";
+            8'd30: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[15:12]) : "0";
+            8'd31: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[11:8]) : "0";
+            8'd32: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[7:4]) : "0";
+            8'd33: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_date_bcd_arg[3:0]) : "0";
             8'd34: save_path_byte = "_";
-            8'd35: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_time_bcd[23:20]) : "0";
-            8'd36: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_time_bcd[19:16]) : "0";
-            8'd37: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_time_bcd[15:12]) : "0";
-            8'd38: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_time_bcd[11:8]) : "0";
-            8'd39: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_time_bcd[7:4]) : "0";
-            8'd40: save_path_byte = snap_rtc_valid ? ascii_bcd_digit(snap_rtc_time_bcd[3:0]) : "0";
+            8'd35: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_time_bcd_arg[23:20]) : "0";
+            8'd36: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_time_bcd_arg[19:16]) : "0";
+            8'd37: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_time_bcd_arg[15:12]) : "0";
+            8'd38: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_time_bcd_arg[11:8]) : "0";
+            8'd39: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_time_bcd_arg[7:4]) : "0";
+            8'd40: save_path_byte = rtc_valid_arg ? ascii_bcd_digit(rtc_time_bcd_arg[3:0]) : "0";
             8'd41: save_path_byte = "_";
-            8'd42: save_path_byte = ascii_hex_digit(snap_save_sequence[7:4]);
-            8'd43: save_path_byte = ascii_hex_digit(snap_save_sequence[3:0]);
+            8'd42: save_path_byte = ascii_hex_digit(save_sequence_arg[7:4]);
+            8'd43: save_path_byte = ascii_hex_digit(save_sequence_arg[3:0]);
             8'd44: save_path_byte = ".";
             8'd45: save_path_byte = "s";
             8'd46: save_path_byte = "n";
@@ -212,23 +216,45 @@ endfunction
 
 function automatic [7:0] openfile_byte;
     input [8:0] index;
+    input [31:0] snapshot_total_bytes_arg;
+    input [31:0] rtc_date_bcd_arg;
+    input [31:0] rtc_time_bcd_arg;
+    input        rtc_valid_arg;
+    input [7:0]  save_sequence_arg;
     begin
         case (index)
             9'd256: openfile_byte = OPENFILE_FLAGS;
             9'd257: openfile_byte = 8'd0;
             9'd258: openfile_byte = 8'd0;
             9'd259: openfile_byte = 8'd0;
-            9'd260: openfile_byte = snapshot_total_bytes[7:0];
-            9'd261: openfile_byte = snapshot_total_bytes[15:8];
-            9'd262: openfile_byte = snapshot_total_bytes[23:16];
-            9'd263: openfile_byte = snapshot_total_bytes[31:24];
-            default: openfile_byte = (index < 9'd48) ? save_path_byte(index[7:0]) : 8'd0;
+            9'd260: openfile_byte = snapshot_total_bytes_arg[7:0];
+            9'd261: openfile_byte = snapshot_total_bytes_arg[15:8];
+            9'd262: openfile_byte = snapshot_total_bytes_arg[23:16];
+            9'd263: openfile_byte = snapshot_total_bytes_arg[31:24];
+            default: openfile_byte = (index < 9'd48) ?
+                save_path_byte(index[7:0], rtc_date_bcd_arg, rtc_time_bcd_arg, rtc_valid_arg, save_sequence_arg) : 8'd0;
         endcase
     end
 endfunction
 
 function automatic [7:0] header_byte;
     input [7:0] index;
+    input [211:0] state_cpu_dir_arg;
+    input [4:0]   state_crtc_addr_arg;
+    input [143:0] state_crtc_regs_arg;
+    input [4:0]   state_ga_inksel_arg;
+    input [135:0] state_ga_palette_arg;
+    input [7:0]   state_ga_config_arg;
+    input [7:0]   state_ram_config_arg;
+    input [7:0]   state_rom_select_arg;
+    input [7:0]   state_ppi_a_arg;
+    input [7:0]   state_ppi_b_arg;
+    input [7:0]   state_ppi_c_arg;
+    input [7:0]   state_ppi_control_arg;
+    input [3:0]   state_psg_addr_arg;
+    input [127:0] state_psg_regs_arg;
+    input [15:0]  snapshot_mem_size_kb_arg;
+    input [7:0]   snapshot_machine_type_arg;
     begin
         case (index)
             8'h00: header_byte = "M";
@@ -240,99 +266,99 @@ function automatic [7:0] header_byte;
             8'h06: header_byte = "N";
             8'h07: header_byte = "A";
             8'h10: header_byte = 8'd2;
-            8'h11: header_byte = snap_state_cpu_dir[15:8];
-            8'h12: header_byte = snap_state_cpu_dir[7:0];
-            8'h13: header_byte = snap_state_cpu_dir[87:80];
-            8'h14: header_byte = snap_state_cpu_dir[95:88];
-            8'h15: header_byte = snap_state_cpu_dir[103:96];
-            8'h16: header_byte = snap_state_cpu_dir[111:104];
-            8'h17: header_byte = snap_state_cpu_dir[119:112];
-            8'h18: header_byte = snap_state_cpu_dir[127:120];
-            8'h19: header_byte = snap_state_cpu_dir[47:40];
-            8'h1a: header_byte = snap_state_cpu_dir[39:32];
-            8'h1b: header_byte = {7'd0, snap_state_cpu_dir[210]};
-            8'h1c: header_byte = {7'd0, snap_state_cpu_dir[211]};
-            8'h1d: header_byte = snap_state_cpu_dir[135:128];
-            8'h1e: header_byte = snap_state_cpu_dir[143:136];
-            8'h1f: header_byte = snap_state_cpu_dir[199:192];
-            8'h20: header_byte = snap_state_cpu_dir[207:200];
-            8'h21: header_byte = snap_state_cpu_dir[55:48];
-            8'h22: header_byte = snap_state_cpu_dir[63:56];
-            8'h23: header_byte = snap_state_cpu_dir[71:64];
-            8'h24: header_byte = snap_state_cpu_dir[79:72];
-            8'h25: header_byte = {6'd0, snap_state_cpu_dir[209:208]};
-            8'h26: header_byte = snap_state_cpu_dir[31:24];
-            8'h27: header_byte = snap_state_cpu_dir[23:16];
-            8'h28: header_byte = snap_state_cpu_dir[151:144];
-            8'h29: header_byte = snap_state_cpu_dir[159:152];
-            8'h2a: header_byte = snap_state_cpu_dir[167:160];
-            8'h2b: header_byte = snap_state_cpu_dir[175:168];
-            8'h2c: header_byte = snap_state_cpu_dir[183:176];
-            8'h2d: header_byte = snap_state_cpu_dir[191:184];
-            8'h2e: header_byte = {3'd0, snap_state_ga_inksel};
-            8'h2f: header_byte = snap_state_ga_palette[7:0];
-            8'h30: header_byte = snap_state_ga_palette[15:8];
-            8'h31: header_byte = snap_state_ga_palette[23:16];
-            8'h32: header_byte = snap_state_ga_palette[31:24];
-            8'h33: header_byte = snap_state_ga_palette[39:32];
-            8'h34: header_byte = snap_state_ga_palette[47:40];
-            8'h35: header_byte = snap_state_ga_palette[55:48];
-            8'h36: header_byte = snap_state_ga_palette[63:56];
-            8'h37: header_byte = snap_state_ga_palette[71:64];
-            8'h38: header_byte = snap_state_ga_palette[79:72];
-            8'h39: header_byte = snap_state_ga_palette[87:80];
-            8'h3a: header_byte = snap_state_ga_palette[95:88];
-            8'h3b: header_byte = snap_state_ga_palette[103:96];
-            8'h3c: header_byte = snap_state_ga_palette[111:104];
-            8'h3d: header_byte = snap_state_ga_palette[119:112];
-            8'h3e: header_byte = snap_state_ga_palette[127:120];
-            8'h3f: header_byte = snap_state_ga_palette[135:128];
-            8'h40: header_byte = snap_state_ga_config;
-            8'h41: header_byte = snap_state_ram_config;
-            8'h42: header_byte = {3'd0, snap_state_crtc_addr};
-            8'h43: header_byte = snap_state_crtc_regs[7:0];
-            8'h44: header_byte = snap_state_crtc_regs[15:8];
-            8'h45: header_byte = snap_state_crtc_regs[23:16];
-            8'h46: header_byte = snap_state_crtc_regs[31:24];
-            8'h47: header_byte = snap_state_crtc_regs[39:32];
-            8'h48: header_byte = snap_state_crtc_regs[47:40];
-            8'h49: header_byte = snap_state_crtc_regs[55:48];
-            8'h4a: header_byte = snap_state_crtc_regs[63:56];
-            8'h4b: header_byte = snap_state_crtc_regs[71:64];
-            8'h4c: header_byte = snap_state_crtc_regs[79:72];
-            8'h4d: header_byte = snap_state_crtc_regs[87:80];
-            8'h4e: header_byte = snap_state_crtc_regs[95:88];
-            8'h4f: header_byte = snap_state_crtc_regs[103:96];
-            8'h50: header_byte = snap_state_crtc_regs[111:104];
-            8'h51: header_byte = snap_state_crtc_regs[119:112];
-            8'h52: header_byte = snap_state_crtc_regs[127:120];
-            8'h53: header_byte = snap_state_crtc_regs[135:128];
-            8'h54: header_byte = snap_state_crtc_regs[143:136];
-            8'h55: header_byte = snap_state_rom_select;
-            8'h56: header_byte = snap_state_ppi_a;
-            8'h57: header_byte = snap_state_ppi_b;
-            8'h58: header_byte = snap_state_ppi_c;
-            8'h59: header_byte = snap_state_ppi_control;
-            8'h5a: header_byte = {4'd0, snap_state_psg_addr};
-            8'h5b: header_byte = snap_state_psg_regs[7:0];
-            8'h5c: header_byte = snap_state_psg_regs[15:8];
-            8'h5d: header_byte = snap_state_psg_regs[23:16];
-            8'h5e: header_byte = snap_state_psg_regs[31:24];
-            8'h5f: header_byte = snap_state_psg_regs[39:32];
-            8'h60: header_byte = snap_state_psg_regs[47:40];
-            8'h61: header_byte = snap_state_psg_regs[55:48];
-            8'h62: header_byte = snap_state_psg_regs[63:56];
-            8'h63: header_byte = snap_state_psg_regs[71:64];
-            8'h64: header_byte = snap_state_psg_regs[79:72];
-            8'h65: header_byte = snap_state_psg_regs[87:80];
-            8'h66: header_byte = snap_state_psg_regs[95:88];
-            8'h67: header_byte = snap_state_psg_regs[103:96];
-            8'h68: header_byte = snap_state_psg_regs[111:104];
-            8'h69: header_byte = snap_state_psg_regs[119:112];
-            8'h6a: header_byte = snap_state_psg_regs[127:120];
-            8'h6b: header_byte = snapshot_mem_size_kb[7:0];
-            8'h6c: header_byte = snapshot_mem_size_kb[15:8];
-            8'h6d: header_byte = snapshot_machine_type;
+            8'h11: header_byte = state_cpu_dir_arg[15:8];
+            8'h12: header_byte = state_cpu_dir_arg[7:0];
+            8'h13: header_byte = state_cpu_dir_arg[87:80];
+            8'h14: header_byte = state_cpu_dir_arg[95:88];
+            8'h15: header_byte = state_cpu_dir_arg[103:96];
+            8'h16: header_byte = state_cpu_dir_arg[111:104];
+            8'h17: header_byte = state_cpu_dir_arg[119:112];
+            8'h18: header_byte = state_cpu_dir_arg[127:120];
+            8'h19: header_byte = state_cpu_dir_arg[47:40];
+            8'h1a: header_byte = state_cpu_dir_arg[39:32];
+            8'h1b: header_byte = {7'd0, state_cpu_dir_arg[210]};
+            8'h1c: header_byte = {7'd0, state_cpu_dir_arg[211]};
+            8'h1d: header_byte = state_cpu_dir_arg[135:128];
+            8'h1e: header_byte = state_cpu_dir_arg[143:136];
+            8'h1f: header_byte = state_cpu_dir_arg[199:192];
+            8'h20: header_byte = state_cpu_dir_arg[207:200];
+            8'h21: header_byte = state_cpu_dir_arg[55:48];
+            8'h22: header_byte = state_cpu_dir_arg[63:56];
+            8'h23: header_byte = state_cpu_dir_arg[71:64];
+            8'h24: header_byte = state_cpu_dir_arg[79:72];
+            8'h25: header_byte = {6'd0, state_cpu_dir_arg[209:208]};
+            8'h26: header_byte = state_cpu_dir_arg[31:24];
+            8'h27: header_byte = state_cpu_dir_arg[23:16];
+            8'h28: header_byte = state_cpu_dir_arg[151:144];
+            8'h29: header_byte = state_cpu_dir_arg[159:152];
+            8'h2a: header_byte = state_cpu_dir_arg[167:160];
+            8'h2b: header_byte = state_cpu_dir_arg[175:168];
+            8'h2c: header_byte = state_cpu_dir_arg[183:176];
+            8'h2d: header_byte = state_cpu_dir_arg[191:184];
+            8'h2e: header_byte = {3'd0, state_ga_inksel_arg};
+            8'h2f: header_byte = state_ga_palette_arg[7:0];
+            8'h30: header_byte = state_ga_palette_arg[15:8];
+            8'h31: header_byte = state_ga_palette_arg[23:16];
+            8'h32: header_byte = state_ga_palette_arg[31:24];
+            8'h33: header_byte = state_ga_palette_arg[39:32];
+            8'h34: header_byte = state_ga_palette_arg[47:40];
+            8'h35: header_byte = state_ga_palette_arg[55:48];
+            8'h36: header_byte = state_ga_palette_arg[63:56];
+            8'h37: header_byte = state_ga_palette_arg[71:64];
+            8'h38: header_byte = state_ga_palette_arg[79:72];
+            8'h39: header_byte = state_ga_palette_arg[87:80];
+            8'h3a: header_byte = state_ga_palette_arg[95:88];
+            8'h3b: header_byte = state_ga_palette_arg[103:96];
+            8'h3c: header_byte = state_ga_palette_arg[111:104];
+            8'h3d: header_byte = state_ga_palette_arg[119:112];
+            8'h3e: header_byte = state_ga_palette_arg[127:120];
+            8'h3f: header_byte = state_ga_palette_arg[135:128];
+            8'h40: header_byte = state_ga_config_arg;
+            8'h41: header_byte = state_ram_config_arg;
+            8'h42: header_byte = {3'd0, state_crtc_addr_arg};
+            8'h43: header_byte = state_crtc_regs_arg[7:0];
+            8'h44: header_byte = state_crtc_regs_arg[15:8];
+            8'h45: header_byte = state_crtc_regs_arg[23:16];
+            8'h46: header_byte = state_crtc_regs_arg[31:24];
+            8'h47: header_byte = state_crtc_regs_arg[39:32];
+            8'h48: header_byte = state_crtc_regs_arg[47:40];
+            8'h49: header_byte = state_crtc_regs_arg[55:48];
+            8'h4a: header_byte = state_crtc_regs_arg[63:56];
+            8'h4b: header_byte = state_crtc_regs_arg[71:64];
+            8'h4c: header_byte = state_crtc_regs_arg[79:72];
+            8'h4d: header_byte = state_crtc_regs_arg[87:80];
+            8'h4e: header_byte = state_crtc_regs_arg[95:88];
+            8'h4f: header_byte = state_crtc_regs_arg[103:96];
+            8'h50: header_byte = state_crtc_regs_arg[111:104];
+            8'h51: header_byte = state_crtc_regs_arg[119:112];
+            8'h52: header_byte = state_crtc_regs_arg[127:120];
+            8'h53: header_byte = state_crtc_regs_arg[135:128];
+            8'h54: header_byte = state_crtc_regs_arg[143:136];
+            8'h55: header_byte = state_rom_select_arg;
+            8'h56: header_byte = state_ppi_a_arg;
+            8'h57: header_byte = state_ppi_b_arg;
+            8'h58: header_byte = state_ppi_c_arg;
+            8'h59: header_byte = state_ppi_control_arg;
+            8'h5a: header_byte = {4'd0, state_psg_addr_arg};
+            8'h5b: header_byte = state_psg_regs_arg[7:0];
+            8'h5c: header_byte = state_psg_regs_arg[15:8];
+            8'h5d: header_byte = state_psg_regs_arg[23:16];
+            8'h5e: header_byte = state_psg_regs_arg[31:24];
+            8'h5f: header_byte = state_psg_regs_arg[39:32];
+            8'h60: header_byte = state_psg_regs_arg[47:40];
+            8'h61: header_byte = state_psg_regs_arg[55:48];
+            8'h62: header_byte = state_psg_regs_arg[63:56];
+            8'h63: header_byte = state_psg_regs_arg[71:64];
+            8'h64: header_byte = state_psg_regs_arg[79:72];
+            8'h65: header_byte = state_psg_regs_arg[87:80];
+            8'h66: header_byte = state_psg_regs_arg[95:88];
+            8'h67: header_byte = state_psg_regs_arg[103:96];
+            8'h68: header_byte = state_psg_regs_arg[111:104];
+            8'h69: header_byte = state_psg_regs_arg[119:112];
+            8'h6a: header_byte = state_psg_regs_arg[127:120];
+            8'h6b: header_byte = snapshot_mem_size_kb_arg[7:0];
+            8'h6c: header_byte = snapshot_mem_size_kb_arg[15:8];
+            8'h6d: header_byte = snapshot_machine_type_arg;
             default: header_byte = 8'd0;
         endcase
     end
@@ -340,24 +366,45 @@ endfunction
 
 function automatic [31:0] pack_openfile_word;
     input [8:0] base_index;
+    input [31:0] snapshot_total_bytes_arg;
+    input [31:0] rtc_date_bcd_arg;
+    input [31:0] rtc_time_bcd_arg;
+    input        rtc_valid_arg;
+    input [7:0]  save_sequence_arg;
     begin
         pack_openfile_word = {
-            openfile_byte(base_index + 9'd0),
-            openfile_byte(base_index + 9'd1),
-            openfile_byte(base_index + 9'd2),
-            openfile_byte(base_index + 9'd3)
+            openfile_byte(base_index + 9'd0, snapshot_total_bytes_arg, rtc_date_bcd_arg, rtc_time_bcd_arg, rtc_valid_arg, save_sequence_arg),
+            openfile_byte(base_index + 9'd1, snapshot_total_bytes_arg, rtc_date_bcd_arg, rtc_time_bcd_arg, rtc_valid_arg, save_sequence_arg),
+            openfile_byte(base_index + 9'd2, snapshot_total_bytes_arg, rtc_date_bcd_arg, rtc_time_bcd_arg, rtc_valid_arg, save_sequence_arg),
+            openfile_byte(base_index + 9'd3, snapshot_total_bytes_arg, rtc_date_bcd_arg, rtc_time_bcd_arg, rtc_valid_arg, save_sequence_arg)
         };
     end
 endfunction
 
 function automatic [31:0] pack_header_word;
     input [7:0] base_index;
+    input [211:0] state_cpu_dir_arg;
+    input [4:0]   state_crtc_addr_arg;
+    input [143:0] state_crtc_regs_arg;
+    input [4:0]   state_ga_inksel_arg;
+    input [135:0] state_ga_palette_arg;
+    input [7:0]   state_ga_config_arg;
+    input [7:0]   state_ram_config_arg;
+    input [7:0]   state_rom_select_arg;
+    input [7:0]   state_ppi_a_arg;
+    input [7:0]   state_ppi_b_arg;
+    input [7:0]   state_ppi_c_arg;
+    input [7:0]   state_ppi_control_arg;
+    input [3:0]   state_psg_addr_arg;
+    input [127:0] state_psg_regs_arg;
+    input [15:0]  snapshot_mem_size_kb_arg;
+    input [7:0]   snapshot_machine_type_arg;
     begin
         pack_header_word = {
-            header_byte(base_index + 8'd0),
-            header_byte(base_index + 8'd1),
-            header_byte(base_index + 8'd2),
-            header_byte(base_index + 8'd3)
+            header_byte(base_index + 8'd0, state_cpu_dir_arg, state_crtc_addr_arg, state_crtc_regs_arg, state_ga_inksel_arg, state_ga_palette_arg, state_ga_config_arg, state_ram_config_arg, state_rom_select_arg, state_ppi_a_arg, state_ppi_b_arg, state_ppi_c_arg, state_ppi_control_arg, state_psg_addr_arg, state_psg_regs_arg, snapshot_mem_size_kb_arg, snapshot_machine_type_arg),
+            header_byte(base_index + 8'd1, state_cpu_dir_arg, state_crtc_addr_arg, state_crtc_regs_arg, state_ga_inksel_arg, state_ga_palette_arg, state_ga_config_arg, state_ram_config_arg, state_rom_select_arg, state_ppi_a_arg, state_ppi_b_arg, state_ppi_c_arg, state_ppi_control_arg, state_psg_addr_arg, state_psg_regs_arg, snapshot_mem_size_kb_arg, snapshot_machine_type_arg),
+            header_byte(base_index + 8'd2, state_cpu_dir_arg, state_crtc_addr_arg, state_crtc_regs_arg, state_ga_inksel_arg, state_ga_palette_arg, state_ga_config_arg, state_ram_config_arg, state_rom_select_arg, state_ppi_a_arg, state_ppi_b_arg, state_ppi_c_arg, state_ppi_control_arg, state_psg_addr_arg, state_psg_regs_arg, snapshot_mem_size_kb_arg, snapshot_machine_type_arg),
+            header_byte(base_index + 8'd3, state_cpu_dir_arg, state_crtc_addr_arg, state_crtc_regs_arg, state_ga_inksel_arg, state_ga_palette_arg, state_ga_config_arg, state_ram_config_arg, state_rom_select_arg, state_ppi_a_arg, state_ppi_b_arg, state_ppi_c_arg, state_ppi_control_arg, state_psg_addr_arg, state_psg_regs_arg, snapshot_mem_size_kb_arg, snapshot_machine_type_arg)
         };
     end
 endfunction
@@ -483,7 +530,14 @@ always @(posedge clk or negedge reset_n) begin
             ST_OPENFILE_PREP: begin
                 buffer_b_wr   <= 1'b1;
                 buffer_b_addr <= chunk_word_index;
-                buffer_b_din  <= pack_openfile_word({chunk_word_index[6:0], 2'b00});
+                buffer_b_din  <= pack_openfile_word(
+                    {chunk_word_index[6:0], 2'b00},
+                    snapshot_total_bytes,
+                    snap_rtc_date_bcd,
+                    snap_rtc_time_bcd,
+                    snap_rtc_valid,
+                    snap_save_sequence
+                );
 
                 if (chunk_word_index == (OPENFILE_WORDS - 8'd1)) begin
                     target_dataslot_openfile <= 1'b1;
@@ -531,8 +585,8 @@ always @(posedge clk or negedge reset_n) begin
                 target_dataslot_slotoffset <= file_offset;
                 target_dataslot_length <= (bytes_remaining > CHUNK_BYTES) ? CHUNK_BYTES : bytes_remaining;
                 chunk_len <= (bytes_remaining > CHUNK_BYTES) ? CHUNK_BYTES[10:0] : bytes_remaining[10:0];
-                chunk_word_count <= (bytes_remaining > CHUNK_BYTES) ? {1'b0, CHUNK_BYTES[10:2]} :
-                                     {1'b0, bytes_remaining[10:2]};
+                chunk_word_count <= (bytes_remaining > CHUNK_BYTES) ? CHUNK_BYTES[10:2] :
+                                     bytes_remaining[10:2];
                 chunk_word_index <= 8'd0;
                 state <= ST_FILL_HEADER;
             end
@@ -542,7 +596,25 @@ always @(posedge clk or negedge reset_n) begin
 
                 if (current_word_byte_offset < SNAPSHOT_HDR_SIZE) begin
                     buffer_b_wr  <= 1'b1;
-                    buffer_b_din <= pack_header_word(current_word_byte_offset[7:0]);
+                    buffer_b_din <= pack_header_word(
+                        current_word_byte_offset[7:0],
+                        snap_state_cpu_dir,
+                        snap_state_crtc_addr,
+                        snap_state_crtc_regs,
+                        snap_state_ga_inksel,
+                        snap_state_ga_palette,
+                        snap_state_ga_config,
+                        snap_state_ram_config,
+                        snap_state_rom_select,
+                        snap_state_ppi_a,
+                        snap_state_ppi_b,
+                        snap_state_ppi_c,
+                        snap_state_ppi_control,
+                        snap_state_psg_addr,
+                        snap_state_psg_regs,
+                        snapshot_mem_size_kb,
+                        snapshot_machine_type
+                    );
                     state        <= ST_CHUNK_NEXT;
                 end else begin
                     mem_word_base <= current_mem_byte_offset[16:1];

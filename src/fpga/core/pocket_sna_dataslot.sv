@@ -77,7 +77,6 @@ reg [3:0]  state = ST_IDLE;
 reg        pending_load = 1'b0;
 reg [31:0] pending_size = 32'd0;
 reg [31:0] file_offset = 32'd0;
-reg [31:0] file_size = 32'd0;
 reg [31:0] remaining = 32'd0;
 reg [10:0] chunk_len = 11'd0;
 reg [10:0] stream_index = 11'd0;
@@ -133,7 +132,6 @@ always @(posedge clk or negedge reset_n) begin
         pending_load               <= 1'b0;
         pending_size               <= 32'd0;
         file_offset                <= 32'd0;
-        file_size                  <= 32'd0;
         remaining                  <= 32'd0;
         chunk_len                  <= 11'd0;
         stream_index               <= 11'd0;
@@ -185,7 +183,6 @@ always @(posedge clk or negedge reset_n) begin
                 if (enable && pending_load) begin
                     pending_load      <= 1'b0;
                     file_offset       <= 32'd0;
-                    file_size         <= pending_size;
                     remaining         <= pending_size;
                     sna_cpu_dir       <= 212'd0;
                     sna_crtc_addr     <= 5'd0;

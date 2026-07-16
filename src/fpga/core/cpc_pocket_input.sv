@@ -380,9 +380,10 @@ endfunction
 function [9:0] map_vkb_button_to_ps2;
     input [3:0] button;
     input       is_pressed;
+    input [8:0] held_ps2;
     begin
         case (button)
-            4'd4: map_vkb_button_to_ps2 = is_pressed ? map_vkb_index_to_ps2(vkb_index, vkb_page) : {1'b1, vkb_a_ps2};
+            4'd4: map_vkb_button_to_ps2 = is_pressed ? map_vkb_index_to_ps2(vkb_index, vkb_page) : {1'b1, held_ps2};
             4'd5: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // B -> Space
             4'd6: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // X -> Return
             4'd7: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h66}; // Y -> Delete/Backspace
@@ -1059,7 +1060,7 @@ always @(*) begin
 
     for (scan_idx = 0; scan_idx < 16; scan_idx = scan_idx + 1) begin
         if (next_pending[scan_idx] && !selected_valid) begin
-            if (vkb_active) selected_ps2 = map_vkb_button_to_ps2(scan_idx[3:0], buttons[scan_idx]);
+            if (vkb_active) selected_ps2 = map_vkb_button_to_ps2(scan_idx[3:0], buttons[scan_idx], vkb_a_ps2);
             else selected_ps2 = map_normal_button_to_ps2(scan_idx[3:0]);
 
             if (selected_ps2[9]) begin

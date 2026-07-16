@@ -721,7 +721,9 @@ always @(posedge clk_sys) begin : fdc
 				tinfo_lock <= 0;
 				i_secinfo_valid[sector_search_ds0][sector_search_hds] <= 1;
 				i_current_sector_pos[sector_search_ds0][sector_search_hds] <= i_next_sector_pos[sector_search_ds0][sector_search_hds];
-				sector_end_pos[sector_search_ds0][sector_search_hds] <= SECTOR_SIZE(sector_n[sector_search_ds0][sector_search_hds], sector_length[sector_search_ds0][sector_search_hds]) + SECTOR_EXTRA_DATA_LEN - 1;
+				sector_end_pos[sector_search_ds0][sector_search_hds] <=
+					{1'b0, SECTOR_SIZE(sector_n[sector_search_ds0][sector_search_hds], sector_length[sector_search_ds0][sector_search_hds])} +
+					{1'b0, SECTOR_EXTRA_DATA_LEN} - 17'd1;
 				sector_search_state <= 0;
 			end else if (i_current_sector == i_current_track_sectors[sector_search_ds0][sector_search_hds] - 1) begin
 				$display("sector no. %d not found!", i_next_sector_pos[sector_search_ds0][sector_search_hds]);

@@ -46,7 +46,7 @@ module Amstrad_MMU
 reg [2:0] RAMmap;
 reg [4:0] RAMpage;
 reg [7:0] ROMbank;
-wire [2:0] ram_page_sel = RAMpage - 5'd3;
+wire [2:0] ram_page_sel = RAMpage[2:0] - 3'd3;
 
 assign state_ram_config = {2'b00, ram_page_sel, RAMmap};
 assign state_rom_select = ROMbank;

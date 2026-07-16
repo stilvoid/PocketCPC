@@ -156,12 +156,10 @@ end
     reg     [31:0]  host_20; // parameter data
     reg     [31:0]  host_24;
     reg     [31:0]  host_28;
-    reg     [31:0]  host_2C;
-    
     reg     [31:0]  host_40; // response data
     reg     [31:0]  host_44;
     reg     [31:0]  host_48;
-    reg     [31:0]  host_4C;    
+    reg     [31:0]  host_4C = 32'd0;
     
     reg             host_cmd_start;
     reg     [15:0]  host_cmd_startval;
@@ -186,11 +184,6 @@ localparam  [3:0]   ST_DONE_ERR     = 'd15;
     reg     [31:0]  target_24;
     reg     [31:0]  target_28;
     reg     [31:0]  target_2C;
-    
-    reg     [31:0]  target_40; // response data
-    reg     [31:0]  target_44;
-    reg     [31:0]  target_48;
-    reg     [31:0]  target_4C;  
     
 localparam  [3:0]   TARG_ST_IDLE        = 'd0;
 localparam  [3:0]   TARG_ST_READYTORUN  = 'd1;
@@ -307,7 +300,7 @@ always @(posedge clk) begin
     
     
     b_datatable_wren <= 0;
-    b_datatable_addr <= bridge_addr >> 2;
+    b_datatable_addr <= bridge_addr[11:2];
         
     if(bridge_wr) begin
         casex(bridge_addr)
@@ -325,7 +318,6 @@ always @(posedge clk) begin
             8'h20: host_20 <= bridge_wr_data_in; // parameter data regs
             8'h24: host_24 <= bridge_wr_data_in;
             8'h28: host_28 <= bridge_wr_data_in;
-            8'h2C: host_2C <= bridge_wr_data_in;
             endcase
         end
 	        32'hF8xx10xx: begin
@@ -336,10 +328,6 @@ always @(posedge clk) begin
 	            end
 	            8'h4: target_4 <= bridge_wr_data_in; // parameter data pointer
 	            8'h8: target_8 <= bridge_wr_data_in; // response data pointer
-	            8'h40: target_40 <= bridge_wr_data_in; // response data regs
-            8'h44: target_44 <= bridge_wr_data_in;
-            8'h48: target_48 <= bridge_wr_data_in;
-            8'h4C: target_4C <= bridge_wr_data_in;
             endcase
         end
         32'hF8xx2xxx: begin
@@ -495,6 +483,7 @@ always @(posedge clk) begin
             host_40 <= savestate_supported; 
             host_44 <= savestate_addr;
             host_48 <= savestate_size;
+            host_4C <= 32'd0;
             
             host_resultcode <= 0;
             if(savestate_start_busy) host_resultcode <= 1;
@@ -517,6 +506,7 @@ always @(posedge clk) begin
             host_40 <= savestate_supported; 
             host_44 <= savestate_addr;
             host_48 <= savestate_maxloadsize;
+            host_4C <= 32'd0;
             
             host_resultcode <= 0;
             if(savestate_load_busy) host_resultcode <= 1;
