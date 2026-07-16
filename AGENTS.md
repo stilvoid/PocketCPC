@@ -82,6 +82,14 @@ Local PocketCPC code should own only:
 
 - Avoid rebuilding or reinstalling artifacts whose hardware behavior is already
   known.
+- For routine feature work, do not start `make build`, `make report`,
+  `make dist`, or other Quartus-driven flows unless a human explicitly asks for
+  that validation.
+- After code changes, prefer handing off by asking the human collaborator to
+  run `make dist` when they want build, timing, and packaging validation. The
+  default matters here because Quartus builds produce a lot of log output, and
+  having an agent run them can burn a large number of tokens for little value
+  when a human can launch the same command directly.
 - Before starting a long build, be clear what new information that artifact
   should provide.
 - When monitoring `make build`, prefer
