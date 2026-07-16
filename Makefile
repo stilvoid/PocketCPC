@@ -1,10 +1,12 @@
 # User-configurable.
 POCKET_SD ?= /Volumes/Pocket
+REPORT_STRICT ?= 1
 
 # Internal layout.
 CORE_ID := stilvoid.PocketCPC
 PACKAGE_DIR := build/package
 QUARTUS_DIR := build/quartus
+REPORT_SCRIPT := scripts/report_build.py
 CORE_JSON_TEMPLATE := src/pocket/Cores/$(CORE_ID)/core.json
 STAGED_CORE_DIR := $(PACKAGE_DIR)/Cores/$(CORE_ID)
 STAGED_CORE_JSON := $(STAGED_CORE_DIR)/core.json
@@ -50,9 +52,12 @@ PACKAGE_TEMPLATE_INPUTS := $(shell find \
 
 .DEFAULT_GOAL := build
 
-.PHONY: build install dist clean
+.PHONY: build install dist clean report
 
 build: $(STAGE_STAMP) $(STAGED_CORE_JSON) $(STAGED_BITSTREAM) $(STAGED_BUILD_INFO)
+
+report: $(STAGED_CORE_JSON) $(STAGED_BITSTREAM) $(STAGED_BUILD_INFO) $(REPORT_SCRIPT)
+	python3 "$(REPORT_SCRIPT)" $(if $(filter 0 false no off,$(REPORT_STRICT)),,--strict)
 
 $(STAGE_STAMP): $(PACKAGE_TEMPLATE_INPUTS)
 	mkdir -p "$(PACKAGE_DIR)" "$(STAGED_CORE_DIR)"
@@ -98,7 +103,7 @@ install: dist
 
 dist: $(PACKAGE_ZIP)
 
-$(PACKAGE_ZIP): $(STAGE_STAMP) $(STAGED_CORE_JSON) $(STAGED_BITSTREAM) $(STAGED_BUILD_INFO)
+$(PACKAGE_ZIP): report $(STAGE_STAMP) $(STAGED_CORE_JSON) $(STAGED_BITSTREAM) $(STAGED_BUILD_INFO)
 	mkdir -p "dist"
 	rm -f "$@"
 	cd "$(PACKAGE_DIR)" && zip -r -X "../../$@" Assets Cores Platforms

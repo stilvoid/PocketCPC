@@ -208,12 +208,17 @@ Useful commands from the repository root:
 
 ```bash
 make build
+make report
 make dist
 make install
 ```
 
 `make build` stages an installable package under `build/package/`.
-`make dist` writes a release zip under `dist/`.
+`make report` prints a concise Quartus fit/timing summary from the current
+build outputs.
+`make dist` runs that report first and, by default, stops if the report finds a
+timing failure. Use `make dist REPORT_STRICT=0` if you intentionally need a zip
+from a timing-failing build.
 `make install` installs the release package to a Pocket SD card, defaulting to
 `/Volumes/Pocket`, and can be redirected with:
 

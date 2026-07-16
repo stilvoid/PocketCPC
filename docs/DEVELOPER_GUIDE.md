@@ -764,6 +764,7 @@ From the repository root:
 
 ```bash
 make build
+make report
 make install
 make dist
 ```
@@ -806,10 +807,37 @@ Quiet periods during fitter or timing analysis are normal. Prefer:
 zipped successfully and then installs by extracting that archive onto the
 Pocket SD card. Users still need to supply `boot.rom` separately.
 
+### What `make report` does
+
+It reads the current Quartus output files under `build/quartus/output_files/`
+and prints a concise summary of:
+
+- overall flow and fitter status
+- worst-case setup, hold, and minimum-pulse-width slack
+- key fit pressure, especially RAM-block usage
+- stage elapsed times
+- warning counts by Quartus stage
+
+By default it also acts as a timing gate by returning non-zero when the summary
+shows a timing failure. You can disable that behavior for callers that want a
+best-effort summary by passing `REPORT_STRICT=0`.
+
 ### What `make dist` does
 
-It depends on `make build`, then zips the staged `build/package/Assets`,
-`build/package/Cores`, and `build/package/Platforms` directories into `dist/`.
+It now runs `make report` before creating the archive, so the concise fit and
+timing summary is printed prominently before packaging.
+
+With the default `REPORT_STRICT=1`, `make dist` stops if `make report` finds a
+timing failure. If you intentionally need a release zip from a timing-failing
+build, you can override that with:
+
+```bash
+make dist REPORT_STRICT=0
+```
+
+After the report passes or strict mode is disabled, `make dist` zips the
+staged `build/package/Assets`, `build/package/Cores`, and
+`build/package/Platforms` directories into `dist/`.
 
 The archive layout matches what users expect for Pocket releases: extracting it
 at the root of an SD card creates the right top-level folders directly.

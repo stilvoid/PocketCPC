@@ -48,6 +48,7 @@ Useful commands:
 
 ```bash
 make build
+make report
 make install
 make dist
 ```
@@ -55,8 +56,9 @@ make dist
 Notes:
 
 - `make build` stages a complete installable package under `build/package/`, uses `build/quartus/` as the Quartus workspace, rebuilds the bitstream only when tracked FPGA inputs changed, and refreshes the staged metadata when git version inputs changed.
+- `make report` prints a concise Quartus flow, fit, and timing summary from the current build outputs.
 - `make install` is available for local SD-card installs and depends on `make dist`.
-- `make dist` writes a release zip under `dist/` with `Assets`, `Cores`, and `Platforms` at the archive root. Users still supply `boot.rom` separately.
+- `make dist` writes a release zip under `dist/` with `Assets`, `Cores`, and `Platforms` at the archive root, but first runs `make report` and stops on timing failures unless you override with `REPORT_STRICT=0`. Users still supply `boot.rom` separately.
 - For deeper build troubleshooting, use `scripts/build_core_docker.sh status|log|wait|stop|freshness` directly.
 - Do not put generated bitstreams or build-info files back under `src/pocket/`. Rebuild them into `build/package/` when the new artifact is actually needed for review or hardware validation.
 
