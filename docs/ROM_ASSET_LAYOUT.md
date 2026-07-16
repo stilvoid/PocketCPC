@@ -1,8 +1,10 @@
 # CPC ROM Asset Layout
 
-## File
+## Files
 
 `Assets/amstrad/stilvoid.PocketCPC/boot.rom`
+
+`Assets/amstrad/stilvoid.PocketCPC/custom.rom` optional experimental upper ROM
 
 ROMs are user-supplied. Do not commit copyrighted ROM images.
 
@@ -28,7 +30,10 @@ Current build and packaging assumptions:
 
 - `boot.rom` is exactly `0x28000` bytes, or ten 16 KiB banks
 - the placeholder banks keep the later model ROMs at the same offsets used by MiSTer
-- PocketCPC does not currently consume extra expansion ROM pages beyond those ten banks
+- `custom.rom`, when present, must be exactly `0x4000` bytes
+- `custom.rom` is mapped to CPC upper ROM select `0x08`
+- the current experiment exposes that slot on the CPC 6128 configuration only
+- the current experiment exposes only that one extra expansion ROM page
 
 ## Why bundle ROMs?
 

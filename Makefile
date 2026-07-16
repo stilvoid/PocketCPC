@@ -16,7 +16,11 @@ QUARTUS_BUILD_STAMP := $(QUARTUS_DIR)/.artifacts.stamp
 CORE_VERSION_RAW := $(shell git -C . describe --tags --always --match 'v*' 2>/dev/null || git -C . rev-parse --short HEAD 2>/dev/null || echo unknown)
 CORE_VERSION := $(patsubst v%,%,$(CORE_VERSION_RAW))
 PACKAGE_ZIP := dist/$(CORE_ID)-$(CORE_VERSION).zip
-GIT_METADATA_INPUTS := .git/HEAD $(wildcard .git/packed-refs) $(shell find .git/refs/heads .git/refs/tags -type f 2>/dev/null | sort)
+GIT_HEAD_PATH := $(shell git -C . rev-parse --git-path HEAD 2>/dev/null)
+GIT_PACKED_REFS_PATH := $(shell git -C . rev-parse --git-path packed-refs 2>/dev/null)
+GIT_REFS_HEADS_PATH := $(shell git -C . rev-parse --git-path refs/heads 2>/dev/null)
+GIT_REFS_TAGS_PATH := $(shell git -C . rev-parse --git-path refs/tags 2>/dev/null)
+GIT_METADATA_INPUTS := $(GIT_HEAD_PATH) $(wildcard $(GIT_PACKED_REFS_PATH)) $(shell find $(GIT_REFS_HEADS_PATH) $(GIT_REFS_TAGS_PATH) -type f 2>/dev/null | sort)
 
 FPGA_BUILD_INPUTS := $(shell find src/fpga \
 	\( -path 'src/fpga/db' -o \

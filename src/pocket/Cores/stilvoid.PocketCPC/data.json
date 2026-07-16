@@ -14,6 +14,17 @@
         "address": "0x00000000"
       },
       {
+        "name": "Custom ROM",
+        "id": "0x208",
+        "required": false,
+        "deferload": true,
+        "parameters": 10,
+        "size_exact": "0x00004000",
+        "filename": "custom.rom",
+        "extensions": ["rom"],
+        "address": "0x00000000"
+      },
+      {
         "name": "Drive A",
         "id": "1",
         "required": false,

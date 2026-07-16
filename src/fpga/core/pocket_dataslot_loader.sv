@@ -12,7 +12,8 @@
 
 module pocket_dataslot_loader #(
     parameter [15:0] SLOT_ID = 16'h0200,
-    parameter [31:0] TOTAL_BYTES = 32'h0000_c000
+    parameter [31:0] TOTAL_BYTES = 32'h0000_c000,
+    parameter [17:0] LOADER_ADDR_BASE = 18'd0
 ) (
     input  wire        clk,
     input  wire        bridge_clk,
@@ -43,6 +44,7 @@ module pocket_dataslot_loader #(
     output reg [7:0]   loader_data,
     output reg         loader_done,
     output reg         loader_error,
+    output wire        target_active,
     output wire [3:0]  debug_state,
     output wire [31:0] debug_offset
 );
@@ -75,6 +77,10 @@ wire [31:0] bram_rd_data;
 
 assign debug_state  = debug_state_r;
 assign debug_offset = file_offset;
+assign target_active = (state != ST_RESET) &&
+                       (state != ST_WAIT_START) &&
+                       (state != ST_DONE) &&
+                       (state != ST_ERROR);
 
 bram_block_dp #(
     .DATA(32),
@@ -209,7 +215,7 @@ always @(posedge clk or negedge reset_n) begin
             ST_STREAM_DATA: begin
                 debug_state_r <= ST_STREAM_DATA;
                 loader_wr   <= 1'b1;
-                loader_addr <= file_offset[17:0] + {7'd0, stream_index};
+                loader_addr <= LOADER_ADDR_BASE + file_offset[17:0] + {7'd0, stream_index};
 
                 case (stream_index[1:0])
                     2'b11:   loader_data <= bram_rd_data[31:24];

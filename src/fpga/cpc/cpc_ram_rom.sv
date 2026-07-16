@@ -8,6 +8,7 @@
 //   - ROM page 0x000 is the lower OS ROM.
 //   - ROM page 0x100 is the upper BASIC ROM.
 //   - ROM page 0x107 is the AMSDOS expansion ROM.
+//   - ROM page 0x108 is an optional custom expansion ROM.
 //
 // MiSTer's boot.rom contains ten 16K banks:
 //   OS6128, BASIC1.1, AMSDOS, MF2,
@@ -43,6 +44,7 @@ module cpc_ram_rom (
     input  wire [7:0]  loader_data,
     input  wire        loader_done,
     input  wire        loader_error,
+    input  wire        custom_rom_enable,
     input  wire [1:0]  model,
     input  wire        snapshot_mem_wr,
     input  wire [16:0] snapshot_mem_addr,
@@ -51,14 +53,17 @@ module cpc_ram_rom (
     input  wire [15:0] snapshot_word_addr,
     input  wire [15:0] snapshot_word_data,
     output reg         rom_loaded,
+    output wire        custom_rom_loaded,
     output reg  [255:0] rom_map
 );
 
 localparam [8:0] PAGE_ROM_OS     = 9'h000;
 localparam [8:0] PAGE_ROM_BASIC  = 9'h100;
 localparam [8:0] PAGE_ROM_AMSDOS = 9'h107;
+localparam [8:0] PAGE_ROM_CUSTOM = 9'h108;
 localparam [7:0] ROM_SELECT_BASIC  = 8'h00;
 localparam [7:0] ROM_SELECT_AMSDOS = 8'h07;
+localparam [7:0] ROM_SELECT_CUSTOM = 8'h08;
 
 localparam [3:0] ROM_BANK_OS_6128     = 4'd0;
 localparam [3:0] ROM_BANK_BASIC_6128  = 4'd1;
@@ -70,6 +75,7 @@ localparam [3:0] ROM_BANK_AMSDOS_664  = 4'd6;
 localparam [3:0] ROM_BANK_MF2_664     = 4'd7;
 localparam [3:0] ROM_BANK_OS_464      = 4'd8;
 localparam [3:0] ROM_BANK_BASIC_464   = 4'd9;
+localparam [3:0] ROM_BANK_CUSTOM      = 4'd10;
 
 wire [8:0]  mem_page = mem_addr[22:14];
 wire [13:0] mem_offset = mem_addr[13:0];
@@ -90,6 +96,7 @@ wire [7:0] rom_basic_664_q;
 wire [7:0] rom_amsdos_664_q;
 wire [7:0] rom_os_464_q;
 wire [7:0] rom_basic_464_q;
+wire [7:0] rom_custom_q;
 wire [7:0] rom_os_q;
 wire [7:0] rom_basic_q;
 wire [7:0] rom_amsdos_q;
@@ -148,6 +155,8 @@ dpram #(
 );
 
 assign capture_word_data = {ram_vram_odd_q, ram_vram_even_q};
+
+assign custom_rom_loaded = custom_rom_enable;
 
 dpram #(
     .DATAWIDTH(8),
@@ -269,6 +278,21 @@ dpram #(
     .q_b       ( rom_basic_464_q )
 );
 
+dpram #(
+    .DATAWIDTH(8),
+    .ADDRWIDTH(14)
+) rom_custom (
+    .clock     ( clk ),
+    .address_a ( loader_rom_addr ),
+    .data_a    ( loader_data ),
+    .wren_a    ( loader_wr && (loader_bank == ROM_BANK_CUSTOM) ),
+    .q_a       ( ),
+    .address_b ( mem_offset ),
+    .data_b    ( 8'd0 ),
+    .wren_b    ( 1'b0 ),
+    .q_b       ( rom_custom_q )
+);
+
 assign rom_os_q = (model == 2'd2) ? rom_os_464_q :
                   (model == 2'd1) ? rom_os_664_q :
                                     rom_os_6128_q;
@@ -295,6 +319,9 @@ always @(*) begin
         if (model != 2'd2) begin
             rom_map[ROM_SELECT_AMSDOS] = 1'b1;
         end
+        if ((model == 2'd0) && custom_rom_enable) begin
+            rom_map[ROM_SELECT_CUSTOM] = 1'b1;
+        end
     end
 
     if (cpu_io_rd) begin
@@ -304,6 +331,7 @@ always @(*) begin
             PAGE_ROM_OS:     cpu_din = rom_loaded ? rom_os_q     : 8'hff;
             PAGE_ROM_BASIC:  cpu_din = rom_loaded ? rom_basic_q  : 8'hff;
             PAGE_ROM_AMSDOS: cpu_din = rom_loaded ? rom_amsdos_q : 8'hff;
+            PAGE_ROM_CUSTOM: cpu_din = custom_rom_enable ? rom_custom_q : 8'hff;
             default: begin
                 if (ram_selected) begin
                     cpu_din = ram_addr[0] ? ram_cpu_odd_q : ram_cpu_even_q;

@@ -46,8 +46,10 @@ release candidate.
      CPC core state, RAM, FDC state, tape runtime state, and wrapper state.
 
 8. Expansion ROM support
-   - The boot bundle is currently fixed to the base ten 16 KiB ROM banks.
-   - User-loadable expansion ROM pages still need a Pocket-facing design.
+   - An experimental first step now exists: optional `custom.rom` mapped to
+     upper ROM slot `8`.
+   - The broader multi-slot design still needs a Pocket-facing plan and likely
+     external-memory work if it grows beyond a tiny number of BRAM-backed slots.
 
 9. CPC 464 / CPC 664 as first-class user options
    - The ROM bundle already carries those machine ROMs.

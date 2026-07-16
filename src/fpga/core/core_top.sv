@@ -393,6 +393,11 @@ wire [1:0]  cpc_restore_sna_model = cpc_sna_model;
 wire [3:0]  cpc_loader_state;
 wire [31:0] cpc_loader_offset;
 wire        cpc_rom_loaded;
+wire        cpc_custom_rom_loaded;
+wire        cpc_custom_rom_enable;
+wire        cpc_memory_loader_wr;
+wire [17:0] cpc_memory_loader_addr;
+wire [7:0]  cpc_memory_loader_data;
 wire [31:0] cpc_sd_lba;
 wire [1:0]  cpc_sd_rd;
 wire [1:0]  cpc_sd_wr;
@@ -464,7 +469,7 @@ cpc_pocket_input cpc_input (
 
 cpc_machine_pocket cpc_machine (
     .clk             ( cpc_clk ),
-    .reset           ( !cpc_reset_n | cpc_menu_restart_active ),
+    .reset           ( !cpc_reset_n | cpc_menu_restart_active | !cpc_custom_rom_ready ),
     .rom_reset       ( !cpc_loader_reset_n ),
     .ce_16           ( cpc_ce_16 ),
     .ce_pix          ( cpc_ce_16 ),
@@ -473,11 +478,12 @@ cpc_machine_pocket cpc_machine (
     .ps2_key         ( cpc_ps2_key ),
     .vkb_caps_hold   ( cpc_vkb_caps_pulse ),
     .freeze_cpu      ( cpc_snapshot_save_freeze_cpu ),
-    .loader_wr       ( cpc_loader_wr ),
-    .loader_addr     ( cpc_loader_addr ),
-    .loader_data     ( cpc_loader_data ),
+    .loader_wr       ( cpc_memory_loader_wr ),
+    .loader_addr     ( cpc_memory_loader_addr ),
+    .loader_data     ( cpc_memory_loader_data ),
     .loader_done     ( cpc_loader_done ),
     .loader_error    ( cpc_loader_error ),
+    .custom_rom_enable ( cpc_custom_rom_enable ),
     .stereo_mix_enable ( cpc_stereo_mix_enable ),
     .capture_ram_rd ( cpc_capture_ram_rd ),
     .capture_ram_word_addr ( cpc_capture_ram_word_addr ),
@@ -506,6 +512,7 @@ cpc_machine_pocket cpc_machine (
     .sna_psg_regs    ( cpc_restore_sna_psg_regs ),
     .sna_model       ( cpc_restore_sna_model ),
     .rom_loaded      ( cpc_rom_loaded ),
+    .custom_rom_loaded ( cpc_custom_rom_loaded ),
     .sd_lba          ( cpc_sd_lba ),
     .sd_rd           ( cpc_sd_rd ),
     .sd_wr           ( cpc_sd_wr ),
@@ -1170,13 +1177,22 @@ wire        restart_request_toggle;
 wire        snapshot_save_request_toggle;
 wire        savestate_start_unused;
 wire        savestate_load_unused;
-wire [9:0]  datatable_addr;
+reg  [9:0]  datatable_addr = 10'd0;
 wire [31:0] datatable_q;
+wire [9:0]  rom_loader_datatable_addr_unused;
+wire [9:0]  custom_datatable_addr_unused;
 wire        rom_target_dataslot_read;
 wire [15:0] rom_target_dataslot_id;
 wire [31:0] rom_target_dataslot_slotoffset;
 wire [31:0] rom_target_dataslot_bridgeaddr;
 wire [31:0] rom_target_dataslot_length;
+wire        rom_target_active;
+wire        custom_rom_target_dataslot_read;
+wire [15:0] custom_rom_target_dataslot_id;
+wire [31:0] custom_rom_target_dataslot_slotoffset;
+wire [31:0] custom_rom_target_dataslot_bridgeaddr;
+wire [31:0] custom_rom_target_dataslot_length;
+wire        custom_rom_target_active;
 wire        fdc_target_dataslot_read;
 wire [15:0] fdc_target_dataslot_id;
 wire [31:0] fdc_target_dataslot_slotoffset;
@@ -1204,6 +1220,8 @@ wire        target_dataslot_done_cpc;
 wire [2:0]  target_dataslot_err_cpc;
 wire        loader_cmd_request_flag;
 wire        loader_cmd_write_strobe;
+wire        custom_rom_loader_cmd_request_flag;
+wire        custom_rom_loader_cmd_write_strobe;
 wire        sna_cmd_request_flag;
 wire        sna_cmd_write_strobe;
 wire        fdc_cmd_request_flag;
@@ -1235,6 +1253,7 @@ wire [31:0] dataslot_update_size;
 wire        dataslot_update_s;
 wire [15:0] dataslot_update_id_s;
 wire [31:0] dataslot_update_size_s;
+wire        dataslot_allcomplete;
 wire [3:0]  bridge_target_state;
 wire [15:0] bridge_target_status;
 wire [3:0]  bridge_target_io;
@@ -1244,6 +1263,7 @@ wire [31:0] rtc_date_bcd;
 wire [31:0] rtc_time_bcd;
 wire        rtc_valid;
 wire        dataslot_runtime_enable = cpc_loader_done & cpc_rom_loaded;
+wire        custom_rom_client_selected = custom_rom_target_active;
 wire        snapshot_save_client_selected = dataslot_runtime_enable & snapshot_save_target_active;
 wire        sna_client_selected = dataslot_runtime_enable & !snapshot_save_target_active & sna_target_active;
 wire        tape_client_selected = dataslot_runtime_enable & !snapshot_save_target_active & !sna_target_active & tape_target_active;
@@ -1276,29 +1296,46 @@ wire [15:0] sna_dataslot_id_cpc;
 wire [31:0] sna_dataslot_size_cpc;
 reg         sna_dataslot_toggle_cpc_d = 1'b0;
 wire        sna_dataslot_update_cpc = sna_dataslot_toggle_cpc ^ sna_dataslot_toggle_cpc_d;
+wire        cpc_custom_loader_wr;
+wire [17:0] cpc_custom_loader_addr;
+wire [7:0]  cpc_custom_loader_data;
+wire        cpc_custom_loader_done;
+wire        cpc_custom_loader_error;
+wire        cpc_custom_rom_loader_start = cpc_loader_done && !cpc_custom_loader_done && !cpc_custom_loader_error;
+assign cpc_custom_rom_enable = cpc_custom_loader_done && !cpc_custom_loader_error;
+wire        cpc_custom_rom_ready = !cpc_loader_done || cpc_custom_loader_done || cpc_custom_loader_error;
 
-assign target_dataslot_read       = snapshot_save_client_selected ? 1'b0 :
+assign cpc_memory_loader_wr   = custom_rom_target_active ? cpc_custom_loader_wr : cpc_loader_wr;
+assign cpc_memory_loader_addr = custom_rom_target_active ? cpc_custom_loader_addr : cpc_loader_addr;
+assign cpc_memory_loader_data = custom_rom_target_active ? cpc_custom_loader_data : cpc_loader_data;
+
+assign target_dataslot_read       = custom_rom_client_selected ? custom_rom_target_dataslot_read :
+                                    snapshot_save_client_selected ? 1'b0 :
                                     sna_client_selected ? sna_target_dataslot_read :
                                     tape_client_selected ? tape_target_dataslot_read :
                                     fdc_client_selected ? fdc_target_dataslot_read :
                                     rom_target_dataslot_read;
 assign target_dataslot_write      = snapshot_save_client_selected ? snapshot_save_target_dataslot_write : 1'b0;
-assign target_dataslot_id         = snapshot_save_client_selected ? snapshot_save_target_dataslot_id :
+assign target_dataslot_id         = custom_rom_client_selected ? custom_rom_target_dataslot_id :
+                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_id :
                                     sna_client_selected ? sna_target_dataslot_id :
                                     tape_client_selected ? tape_target_dataslot_id :
                                     fdc_client_selected ? fdc_target_dataslot_id :
                                     rom_target_dataslot_id;
-assign target_dataslot_slotoffset = snapshot_save_client_selected ? snapshot_save_target_dataslot_slotoffset :
+assign target_dataslot_slotoffset = custom_rom_client_selected ? custom_rom_target_dataslot_slotoffset :
+                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_slotoffset :
                                     sna_client_selected ? sna_target_dataslot_slotoffset :
                                     tape_client_selected ? tape_target_dataslot_slotoffset :
                                     fdc_client_selected ? fdc_target_dataslot_slotoffset :
                                     rom_target_dataslot_slotoffset;
-assign target_dataslot_bridgeaddr = snapshot_save_client_selected ? snapshot_save_target_dataslot_bridgeaddr :
+assign target_dataslot_bridgeaddr = custom_rom_client_selected ? custom_rom_target_dataslot_bridgeaddr :
+                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_bridgeaddr :
                                     sna_client_selected ? sna_target_dataslot_bridgeaddr :
                                     tape_client_selected ? tape_target_dataslot_bridgeaddr :
                                     fdc_client_selected ? fdc_target_dataslot_bridgeaddr :
                                     rom_target_dataslot_bridgeaddr;
-assign target_dataslot_length     = snapshot_save_client_selected ? snapshot_save_target_dataslot_length :
+assign target_dataslot_length     = custom_rom_client_selected ? custom_rom_target_dataslot_length :
+                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_length :
                                     sna_client_selected ? sna_target_dataslot_length :
                                     tape_client_selected ? tape_target_dataslot_length :
                                     fdc_client_selected ? fdc_target_dataslot_length :
@@ -1315,6 +1352,7 @@ always @(posedge clk_74a) begin
         sna_dataslot_toggle_74 <= 1'b0;
         sna_dataslot_id_74     <= 16'd0;
         sna_dataslot_size_74   <= 32'd0;
+        datatable_addr <= 10'd0;
     end else if (dataslot_update) begin
         if ((dataslot_update_id == 16'h0001) || (dataslot_update_id == 16'h0002)) begin
             fdc_dataslot_toggle_74 <= ~fdc_dataslot_toggle_74;
@@ -1452,7 +1490,7 @@ pocket_dataslot_loader #(
     .bridge_addr                 ( bridge_addr ),
     .bridge_wr                   ( bridge_wr ),
     .bridge_wr_data              ( bridge_wr_data ),
-    .datatable_addr              ( datatable_addr ),
+    .datatable_addr              ( rom_loader_datatable_addr_unused ),
     .datatable_q                 ( datatable_q ),
     .target_dataslot_read        ( rom_target_dataslot_read ),
     .target_dataslot_id          ( rom_target_dataslot_id ),
@@ -1461,17 +1499,53 @@ pocket_dataslot_loader #(
     .target_dataslot_length      ( rom_target_dataslot_length ),
     .cmd_request_flag            ( loader_cmd_request_flag ),
     .cmd_write_strobe            ( loader_cmd_write_strobe ),
-    .cmd_ack_flag                ( (snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : bridge_cmd_ack_flag ),
-    .target_dataslot_ack         ( (snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_ack_cpc ),
-    .target_dataslot_done        ( (snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_done_cpc ),
-    .target_dataslot_err         ( (snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 3'd0 : target_dataslot_err_cpc ),
+    .cmd_ack_flag                ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : bridge_cmd_ack_flag ),
+    .target_dataslot_ack         ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_ack_cpc ),
+    .target_dataslot_done        ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_done_cpc ),
+    .target_dataslot_err         ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 3'd0 : target_dataslot_err_cpc ),
     .loader_wr                   ( cpc_loader_wr ),
     .loader_addr                 ( cpc_loader_addr ),
     .loader_data                 ( cpc_loader_data ),
     .loader_done                 ( cpc_loader_done ),
     .loader_error                ( cpc_loader_error ),
+    .target_active               ( rom_target_active ),
     .debug_state                 ( cpc_loader_state ),
     .debug_offset                ( cpc_loader_offset )
+);
+
+pocket_dataslot_loader #(
+    .SLOT_ID          ( 16'h0208 ),
+    .TOTAL_BYTES      ( 32'h0000_4000 ),
+    .LOADER_ADDR_BASE ( 18'h28000 )
+) custom_rom_loader (
+    .clk                         ( cpc_clk ),
+    .bridge_clk                  ( clk_74a ),
+    .reset_n                     ( cpc_loader_reset_n ),
+    .start                       ( cpc_custom_rom_loader_start ),
+    .bridge_addr                 ( bridge_addr ),
+    .bridge_wr                   ( bridge_wr ),
+    .bridge_wr_data              ( bridge_wr_data ),
+    .datatable_addr              ( custom_datatable_addr_unused ),
+    .datatable_q                 ( datatable_q ),
+    .target_dataslot_read        ( custom_rom_target_dataslot_read ),
+    .target_dataslot_id          ( custom_rom_target_dataslot_id ),
+    .target_dataslot_slotoffset  ( custom_rom_target_dataslot_slotoffset ),
+    .target_dataslot_bridgeaddr  ( custom_rom_target_dataslot_bridgeaddr ),
+    .target_dataslot_length      ( custom_rom_target_dataslot_length ),
+    .cmd_request_flag            ( custom_rom_loader_cmd_request_flag ),
+    .cmd_write_strobe            ( custom_rom_loader_cmd_write_strobe ),
+    .cmd_ack_flag                ( custom_rom_client_selected ? bridge_cmd_ack_flag : 1'b0 ),
+    .target_dataslot_ack         ( custom_rom_client_selected ? target_dataslot_ack_cpc : 1'b0 ),
+    .target_dataslot_done        ( custom_rom_client_selected ? target_dataslot_done_cpc : 1'b0 ),
+    .target_dataslot_err         ( custom_rom_client_selected ? target_dataslot_err_cpc : 3'd0 ),
+    .loader_wr                   ( cpc_custom_loader_wr ),
+    .loader_addr                 ( cpc_custom_loader_addr ),
+    .loader_data                 ( cpc_custom_loader_data ),
+    .loader_done                 ( cpc_custom_loader_done ),
+    .loader_error                ( cpc_custom_loader_error ),
+    .target_active               ( custom_rom_target_active ),
+    .debug_state                 ( ),
+    .debug_offset                ( )
 );
 
 pocket_sna_dataslot sna_loader (
@@ -1615,7 +1689,7 @@ core_bridge_cmd cmd (
     .dataslot_update_s           ( dataslot_update_s ),
     .dataslot_update_id_s        ( dataslot_update_id_s ),
     .dataslot_update_size_s      ( dataslot_update_size_s ),
-    .dataslot_allcomplete        ( ),
+    .dataslot_allcomplete        ( dataslot_allcomplete ),
 
     .rtc_epoch_seconds           ( rtc_epoch_seconds ),
     .rtc_date_bcd                ( rtc_date_bcd ),
@@ -1664,12 +1738,14 @@ core_bridge_cmd cmd (
     .datatable_q                 ( datatable_q ),
 
     .i_clk_sync                  ( cpc_clk ),
-    .i_write_strobe              ( snapshot_save_client_selected ? snapshot_save_cmd_write_strobe :
+    .i_write_strobe              ( custom_rom_client_selected ? custom_rom_loader_cmd_write_strobe :
+                                   snapshot_save_client_selected ? snapshot_save_cmd_write_strobe :
                                    sna_client_selected ? sna_cmd_write_strobe :
                                    tape_client_selected ? tape_cmd_write_strobe :
                                    fdc_client_selected ? fdc_cmd_write_strobe :
                                    loader_cmd_write_strobe ),
-    .i_request_flag              ( snapshot_save_client_selected ? snapshot_save_cmd_request_flag :
+    .i_request_flag              ( custom_rom_client_selected ? custom_rom_loader_cmd_request_flag :
+                                   snapshot_save_client_selected ? snapshot_save_cmd_request_flag :
                                    sna_client_selected ? sna_cmd_request_flag :
                                    tape_client_selected ? tape_cmd_request_flag :
                                    fdc_client_selected ? fdc_cmd_request_flag :

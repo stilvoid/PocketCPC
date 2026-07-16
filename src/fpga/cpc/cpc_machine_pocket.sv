@@ -28,6 +28,7 @@ module cpc_machine_pocket (
     input  wire [7:0]  loader_data,
     input  wire        loader_done,
     input  wire        loader_error,
+    input  wire        custom_rom_enable,
     input  wire        stereo_mix_enable,
     input  wire        capture_ram_rd,
     input  wire [15:0] capture_ram_word_addr,
@@ -56,6 +57,7 @@ module cpc_machine_pocket (
     input  wire [127:0] sna_psg_regs,
     input  wire [1:0]  sna_model,
     output wire        rom_loaded,
+    output wire        custom_rom_loaded,
     output wire [31:0] sd_lba,
     output wire [1:0]  sd_rd,
     output wire [1:0]  sd_wr,
@@ -206,6 +208,7 @@ cpc_ram_rom memory (
     .loader_data  ( loader_data ),
     .loader_done  ( loader_done ),
     .loader_error ( loader_error ),
+    .custom_rom_enable ( custom_rom_enable ),
     .model        ( machine_model ),
     .snapshot_mem_wr   ( snapshot_mem_wr ),
     .snapshot_mem_addr ( snapshot_mem_addr ),
@@ -214,6 +217,7 @@ cpc_ram_rom memory (
     .snapshot_word_addr ( snapshot_word_addr ),
     .snapshot_word_data ( snapshot_word_data ),
     .rom_loaded   ( rom_loaded ),
+    .custom_rom_loaded ( custom_rom_loaded ),
     .rom_map      ( rom_map )
 );
 
