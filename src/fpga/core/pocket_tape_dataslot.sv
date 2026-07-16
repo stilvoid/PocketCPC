@@ -14,6 +14,7 @@ module pocket_tape_dataslot (
     input  wire        bridge_clk,
     input  wire        reset_n,
     input  wire        enable,
+    input  wire        pause,
     input  wire        restart,
 
     input  wire [31:0] bridge_addr,
@@ -168,7 +169,7 @@ tzxplayer #(
     .NORMAL_PILOT_PULSES(4095)
 ) tzxplayer_inst (
     .clk          ( clk ),
-    .ce           ( 1'b1 ),
+    .ce           ( !pause ),
     .restart_tape ( tape_reset ),
     .host_tap_in  ( tape_dout ),
     .tzx_req      ( tape_data_req ),
@@ -291,57 +292,59 @@ always @(posedge clk or negedge reset_n) begin
                 fetch_state <= FT_REQUEST;
             end
 
-            case (serve_state)
-                SV_IDLE: begin
-                    if (enable && (tape_size != 32'd0) && tape_rd && (play_addr < tape_size)) begin
-                        if (current_hit) begin
-                            serve_offset   <= current_offset;
-                            serve_bank     <= current_bank;
-                            serve_byte_sel <= current_offset[1:0];
-                            serve_state    <= SV_BRAM_ADDR;
-                        end else if (next_hit) begin
-                            current_valid  <= 1'b1;
-                            current_base   <= next_base;
-                            current_len    <= next_len;
-                            current_bank   <= next_bank;
-                            next_valid     <= 1'b0;
-                            serve_offset   <= next_offset;
-                            serve_bank     <= next_bank;
-                            serve_byte_sel <= next_offset[1:0];
-                            serve_state    <= SV_BRAM_ADDR;
-                        end else if (!fetch_busy) begin
-                            miss_remaining = remaining_bytes;
-                            miss_bank = current_valid ? ~current_bank : 1'b0;
-                            current_valid  <= 1'b0;
-                            next_valid     <= 1'b0;
-                            fetch_base     <= play_addr;
-                            fetch_len      <= chunk_len13(miss_remaining);
-                            fetch_bank     <= miss_bank;
-                            fetch_to_next  <= 1'b0;
-                            fetch_state    <= FT_REQUEST;
+            if (!pause) begin
+                case (serve_state)
+                    SV_IDLE: begin
+                        if (enable && (tape_size != 32'd0) && tape_rd && (play_addr < tape_size)) begin
+                            if (current_hit) begin
+                                serve_offset   <= current_offset;
+                                serve_bank     <= current_bank;
+                                serve_byte_sel <= current_offset[1:0];
+                                serve_state    <= SV_BRAM_ADDR;
+                            end else if (next_hit) begin
+                                current_valid  <= 1'b1;
+                                current_base   <= next_base;
+                                current_len    <= next_len;
+                                current_bank   <= next_bank;
+                                next_valid     <= 1'b0;
+                                serve_offset   <= next_offset;
+                                serve_bank     <= next_bank;
+                                serve_byte_sel <= next_offset[1:0];
+                                serve_state    <= SV_BRAM_ADDR;
+                            end else if (!fetch_busy) begin
+                                miss_remaining = remaining_bytes;
+                                miss_bank = current_valid ? ~current_bank : 1'b0;
+                                current_valid  <= 1'b0;
+                                next_valid     <= 1'b0;
+                                fetch_base     <= play_addr;
+                                fetch_len      <= chunk_len13(miss_remaining);
+                                fetch_bank     <= miss_bank;
+                                fetch_to_next  <= 1'b0;
+                                fetch_state    <= FT_REQUEST;
+                            end
                         end
                     end
-                end
 
-                SV_BRAM_ADDR: begin
-                    bram_rd_addr <= {serve_bank, serve_offset[11:2]};
-                    serve_state  <= SV_BRAM_WAIT;
-                end
+                    SV_BRAM_ADDR: begin
+                        bram_rd_addr <= {serve_bank, serve_offset[11:2]};
+                        serve_state  <= SV_BRAM_WAIT;
+                    end
 
-                SV_BRAM_WAIT: begin
-                    serve_state <= SV_RESPOND;
-                end
+                    SV_BRAM_WAIT: begin
+                        serve_state <= SV_RESPOND;
+                    end
 
-                SV_RESPOND: begin
-                    tape_dout     <= bridge_byte(bram_rd_data, serve_byte_sel);
-                    tape_data_ack <= ~tape_data_ack;
-                    serve_state   <= SV_IDLE;
-                end
+                    SV_RESPOND: begin
+                        tape_dout     <= bridge_byte(bram_rd_data, serve_byte_sel);
+                        tape_data_ack <= ~tape_data_ack;
+                        serve_state   <= SV_IDLE;
+                    end
 
-                default: begin
-                    serve_state <= SV_IDLE;
-                end
-            endcase
+                    default: begin
+                        serve_state <= SV_IDLE;
+                    end
+                endcase
+            end
 
             case (fetch_state)
                 FT_IDLE: begin

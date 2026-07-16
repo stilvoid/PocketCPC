@@ -14,6 +14,7 @@ module cpc_machine_pocket (
     input  wire        clk,
     input  wire        reset,
     input  wire        rom_reset,
+    input  wire        pause,
     input  wire        ce_16,
     input  wire        ce_pix,
 
@@ -343,16 +344,20 @@ always @(posedge clk) begin
         audio_right_r <= 8'd0;
     end else begin
         old_io_wr <= io_wr;
-        if (!old_io_wr && io_wr && !fdc_sel[3:1]) begin
-            motor <= cpu_dout[0];
-        end
+        if (pause) begin
+            ce_u765 <= 1'b0;
+        end else begin
+            if (!old_io_wr && io_wr && !fdc_sel[3:1]) begin
+                motor <= cpu_dout[0];
+            end
 
-        u765_div <= u765_div + 3'd1;
-        ce_u765  <= !u765_div[2:0];
+            u765_div <= u765_div + 3'd1;
+            ce_u765  <= !u765_div[2:0];
 
-        if (ce_16) begin
-            audio_left_r  <= stereo_mix_enable ? audio_mix_l_crossfeed[7:0] : audio_mix_l_sat;
-            audio_right_r <= stereo_mix_enable ? audio_mix_r_crossfeed[7:0] : audio_mix_r_sat;
+            if (ce_16) begin
+                audio_left_r  <= stereo_mix_enable ? audio_mix_l_crossfeed[7:0] : audio_mix_l_sat;
+                audio_right_r <= stereo_mix_enable ? audio_mix_r_crossfeed[7:0] : audio_mix_r_sat;
+            end
         end
     end
 end

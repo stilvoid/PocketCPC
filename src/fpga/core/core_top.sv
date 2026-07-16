@@ -290,6 +290,8 @@ always @(posedge cpc_clk) begin
     if (!cpc_reset_n) begin
         cpc_div   <= 2'd0;
         cpc_ce_16 <= 1'b0;
+    end else if (cpc_menu_pause_active) begin
+        cpc_ce_16 <= 1'b0;
     end else begin
         cpc_div   <= cpc_div + 2'd1;
         cpc_ce_16 <= !cpc_div[1:0];
@@ -431,6 +433,8 @@ wire        cpc_vkb_shift;
 wire        cpc_vkb_ctrl;
 wire        cpc_vkb_caps;
 wire        cpc_vkb_caps_pulse;
+wire        cpc_menu_inmenu;
+wire        cpc_menu_inmenu_cpc;
 wire        restart_request_toggle_cpc;
 wire        snapshot_save_request_toggle_cpc;
 reg         restart_request_toggle_cpc_d = 1'b0;
@@ -439,8 +443,10 @@ reg  [5:0]  cpc_menu_restart_count = 6'd0;
 wire        cpc_menu_restart_pulse = restart_request_toggle_cpc ^ restart_request_toggle_cpc_d;
 wire        cpc_snapshot_save_pulse_cpc = snapshot_save_request_toggle_cpc ^ snapshot_save_request_toggle_cpc_d;
 wire        cpc_menu_restart_active = (cpc_menu_restart_count != 6'd0);
+wire        cpc_menu_pause_active = cpc_menu_inmenu_cpc;
 
 synch_3 host_reset_sync_cpc(host_reset_stable_n, host_reset_n_cpc, cpc_clk);
+synch_3 menu_inmenu_sync_cpc(cpc_menu_inmenu, cpc_menu_inmenu_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_key_sync_cpc(cont3_key, cont3_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_joy_sync_cpc(cont3_joy, cont3_joy_cpc, cpc_clk);
@@ -471,6 +477,7 @@ cpc_machine_pocket cpc_machine (
     .clk             ( cpc_clk ),
     .reset           ( !cpc_reset_n | cpc_menu_restart_active | !cpc_custom_rom_ready ),
     .rom_reset       ( !cpc_loader_reset_n ),
+    .pause           ( cpc_menu_pause_active ),
     .ce_16           ( cpc_ce_16 ),
     .ce_pix          ( cpc_ce_16 ),
     .joy1            ( cpc_joy1 ),
@@ -1598,6 +1605,7 @@ pocket_tape_dataslot tape_loader (
     .bridge_clk                  ( clk_74a ),
     .reset_n                     ( cpc_loader_reset_n ),
     .enable                      ( dataslot_runtime_enable ),
+    .pause                       ( cpc_menu_pause_active ),
     .restart                     ( !cpc_reset_n ),
     .bridge_addr                 ( bridge_addr ),
     .bridge_wr                   ( bridge_wr ),
@@ -1700,7 +1708,7 @@ core_bridge_cmd cmd (
     .savestate_addr              ( 32'd0 ),
     .savestate_size              ( 32'd0 ),
     .savestate_maxloadsize       ( 32'd0 ),
-    .osnotify_inmenu             ( ),
+    .osnotify_inmenu             ( cpc_menu_inmenu ),
     .savestate_start             ( savestate_start_unused ),
     .savestate_start_ack         ( 1'b0 ),
     .savestate_start_busy        ( 1'b0 ),

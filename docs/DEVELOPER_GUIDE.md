@@ -368,6 +368,11 @@ That gives the design two key clocks:
 
 `core_top.sv` filters that signal so brief glitches do not immediately reset the CPC machine.
 
+The same bridge command path also reports Pocket menu state. In the current
+core, `core_top.sv` synchronizes that notification into the CPC clock domain
+and pauses the CPC-side enable pulses while the Pocket menu is open, then
+resumes normal stepping when the menu closes.
+
 ### Step 5: The ROM bundle loads through data slot `0x200`
 
 `pocket_dataslot_loader.sv` requests data slot `0x200`, which is described in
@@ -688,6 +693,8 @@ In this project it mainly serves as:
 - the framework-facing reset/status block
 - the data-slot command interface used by the ROM loader and FDC adapter
 - the source of `dataslot_update` notifications when media is mounted
+- the source of the Pocket menu-state notification used to pause the CPC while
+  the menu is open
 
 This file is generic, fairly low-level, and not CPC-specific.
 

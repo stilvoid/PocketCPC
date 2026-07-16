@@ -60,7 +60,7 @@ Then:
 
 1. Start `PocketCPC` from openFPGA on the Pocket.
 2. If the ROM bundle is valid, the core should boot to the normal CPC startup screen.
-3. Open the Pocket menu and go to `Core Settings` when you want to mount media or restart the core.
+3. Open the Pocket menu and go to `Core Settings` when you want to mount media or restart the core. Entering the Pocket menu pauses the running CPC and leaving the menu resumes it.
 
 ### Core Settings
 
