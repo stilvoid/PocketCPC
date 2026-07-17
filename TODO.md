@@ -47,13 +47,9 @@ release candidate.
 
 8. Expansion ROM support
    - An experimental first step now exists: optional `custom.rom` mapped to
-     upper ROM slot `8`.
+     upper ROM slot `6`.
    - The broader multi-slot design still needs a Pocket-facing plan and likely
      external-memory work if it grows beyond a tiny number of BRAM-backed slots.
-
-9. CPC 464 / CPC 664 as first-class user options
-   - The ROM bundle already carries those machine ROMs.
-   - The user-facing model-selection flow still needs finishing work and docs.
 
 ## Notes
 

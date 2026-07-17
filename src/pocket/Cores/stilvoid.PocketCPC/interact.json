@@ -3,6 +3,30 @@
     "magic": "APF_VER_1",
     "variables": [
       {
+        "name": "Machine Model",
+        "id": 6,
+        "type": "list",
+        "enabled": true,
+        "persist": false,
+        "address": "0x00000008",
+        "mask": "0xFFFFFFFC",
+        "defaultval": 0,
+        "options": [
+          {
+            "value": 0,
+            "name": "CPC 6128"
+          },
+          {
+            "value": 1,
+            "name": "CPC 664"
+          },
+          {
+            "value": 2,
+            "name": "CPC 464"
+          }
+        ]
+      },
+      {
         "name": "Display Framing",
         "id": 1,
         "type": "list",

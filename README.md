@@ -29,7 +29,7 @@ Optional media goes anywhere under:
 A simple SD-card layout looks like this:
 
 - `Assets/amstrad/stilvoid.PocketCPC/boot.rom`
-- `Assets/amstrad/stilvoid.PocketCPC/custom.rom` optional, 16 KiB, maps to upper ROM slot `8`
+- `Assets/amstrad/stilvoid.PocketCPC/custom.rom` optional, 16 KiB, maps to upper ROM slot `6`
 - `Assets/amstrad/common/disks/*.dsk`
 - `Assets/amstrad/common/tapes/*.cdt`
 - `Assets/amstrad/common/snapshots/*.sna`
@@ -47,14 +47,14 @@ Current loader requirements:
 
 - `boot.rom` must be exactly `0x28000` bytes (160 KiB)
 - the file must live at `Assets/amstrad/stilvoid.PocketCPC/boot.rom`
-- the current public flow is centered on CPC 6128 booting
-- `custom.rom` is an experimental optional 16 KiB upper ROM mapped to slot `8`
+- the Pocket menu defaults to CPC 6128 and can switch to CPC 664 or CPC 464
+- `custom.rom` is an experimental optional 16 KiB upper ROM mapped to slot `6`
 
 See [docs/ROM_ASSET_LAYOUT.md](https://github.com/stilvoid/PocketCPC/blob/main/docs/ROM_ASSET_LAYOUT.md) for the exact bank layout and rationale.
 
 ## First Boot And Use
 
-Start with the release package installed, `boot.rom` in `Assets/amstrad/stilvoid.PocketCPC/boot.rom`, optional `custom.rom` in the same folder when you want to expose one expansion ROM in slot `8`, and any optional `.dsk`, `.cdt`, or `.sna` files copied somewhere under `Assets/amstrad/common/`.
+Start with the release package installed, `boot.rom` in `Assets/amstrad/stilvoid.PocketCPC/boot.rom`, optional `custom.rom` in the same folder when you want to expose one expansion ROM in slot `6`, and any optional `.dsk`, `.cdt`, or `.sna` files copied somewhere under `Assets/amstrad/common/`.
 
 Then:
 
@@ -66,6 +66,8 @@ Then:
 
 The Pocket menu's `Core Settings` entries do this:
 
+- `Machine Model`: choose `CPC 6128`, `CPC 664`, or `CPC 464`; changing it resets the core immediately, and it defaults back to `CPC 6128` on the next launch
+  `CPC 464` follows stock hardware more closely and does not expose the built-in FDC.
 - `Drive A`: mount or change the disk image in drive A
 - `Drive B`: mount or change the disk image in drive B
 - `Tape`: mount or change a tape image
@@ -83,12 +85,13 @@ PocketCPC can optionally load one experimental custom upper ROM:
 - filename: `custom.rom`
 - location: `Assets/amstrad/stilvoid.PocketCPC/custom.rom`
 - size: exactly 16 KiB
-- CPC slot: upper ROM select `8`
+- CPC slot: upper ROM select `6`
 
 This is intended as a first-step experiment for ROM-board-style software such
-as diagnostics or utilities. The current experiment exposes it on the CPC 6128
-configuration only. If you add, remove, or replace `custom.rom`, restart the
-core so the CPC re-scans expansion ROMs during boot.
+as diagnostics or utilities. The current experiment now uses slot `6` so the
+same ROM can be seen on CPC 6128, CPC 664, and CPC 464. If you add, remove, or
+replace `custom.rom`, restart the core so the CPC re-scans expansion ROMs
+during boot.
 
 ### Load software
 
@@ -98,6 +101,9 @@ Typical flow for a disk:
 2. Return to the CPC screen.
 3. Type `CAT` to list files on the disk.
 4. Start a program with `RUN"PROGRAM` or whatever command that disk expects.
+
+This applies directly to CPC 6128 and CPC 664. In CPC 464 mode, the core now
+matches a stock machine more closely by not exposing the built-in FDC.
 
 Useful CPC disk commands:
 
@@ -167,8 +173,7 @@ numpad `.` -> `FDot`. On ISO/UK layouts, the `#~` key maps to CPC `]`.
 - Tape support works but should still be treated as experimental.
 - Snapshot loading is supported, but snapshot saving is not currently exposed as a finished feature.
 - There is no finished user-friendly control remapping UI yet.
-- CPC 464 and CPC 664 are present in the ROM bundle layout, but the user-facing experience is still centered on CPC 6128.
-- Only one experimental custom upper ROM slot is currently exposed, fixed as `custom.rom` -> slot `8`.
+- Only one experimental custom upper ROM slot is currently exposed, fixed as `custom.rom` -> slot `6`.
 
 ## Reporting Issues
 

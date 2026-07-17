@@ -44,7 +44,7 @@ wire        regs_selected = (bridge_addr[31:16] == 16'h0000);
 always @(posedge clk or negedge reset_n) begin
     if (!reset_n) begin
         control        <= 32'h0000_0001;
-        model_config   <= 32'h0000_0002; // MVP default: CPC 6128
+        model_config   <= 32'h0000_0000; // 0=6128, 1=664, 2=464
         av_config      <= 32'h0000_0000;
         interact_config <= 32'h0000_0000;
         media_flags    <= 32'h0000_0000;

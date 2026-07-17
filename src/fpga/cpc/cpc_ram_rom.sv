@@ -8,7 +8,7 @@
 //   - ROM page 0x000 is the lower OS ROM.
 //   - ROM page 0x100 is the upper BASIC ROM.
 //   - ROM page 0x107 is the AMSDOS expansion ROM.
-//   - ROM page 0x108 is an optional custom expansion ROM.
+//   - ROM page 0x106 is an optional custom expansion ROM.
 //
 // MiSTer's boot.rom contains ten 16K banks:
 //   OS6128, BASIC1.1, AMSDOS, MF2,
@@ -60,10 +60,10 @@ module cpc_ram_rom (
 localparam [8:0] PAGE_ROM_OS     = 9'h000;
 localparam [8:0] PAGE_ROM_BASIC  = 9'h100;
 localparam [8:0] PAGE_ROM_AMSDOS = 9'h107;
-localparam [8:0] PAGE_ROM_CUSTOM = 9'h108;
+localparam [8:0] PAGE_ROM_CUSTOM = 9'h106;
 localparam [7:0] ROM_SELECT_BASIC  = 8'h00;
 localparam [7:0] ROM_SELECT_AMSDOS = 8'h07;
-localparam [7:0] ROM_SELECT_CUSTOM = 8'h08;
+localparam [7:0] ROM_SELECT_CUSTOM = 8'h06;
 
 localparam [3:0] ROM_BANK_OS_6128     = 4'd0;
 localparam [3:0] ROM_BANK_BASIC_6128  = 4'd1;
@@ -319,7 +319,7 @@ always @(*) begin
         if (model != 2'd2) begin
             rom_map[ROM_SELECT_AMSDOS] = 1'b1;
         end
-        if ((model == 2'd0) && custom_rom_enable) begin
+        if (custom_rom_enable) begin
             rom_map[ROM_SELECT_CUSTOM] = 1'b1;
         end
     end

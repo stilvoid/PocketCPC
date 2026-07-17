@@ -30,9 +30,10 @@ Current build and packaging assumptions:
 
 - `boot.rom` is exactly `0x28000` bytes, or ten 16 KiB banks
 - the placeholder banks keep the later model ROMs at the same offsets used by MiSTer
+- the Pocket menu selects model `0 = CPC6128`, `1 = CPC664`, `2 = CPC464`
 - `custom.rom`, when present, must be exactly `0x4000` bytes
-- `custom.rom` is mapped to CPC upper ROM select `0x08`
-- the current experiment exposes that slot on the CPC 6128 configuration only
+- `custom.rom` is mapped to CPC upper ROM select `0x06`
+- the current experiment exposes that slot on CPC 6128, CPC 664, and CPC 464
 - the current experiment exposes only that one extra expansion ROM page
 
 ## Why bundle ROMs?

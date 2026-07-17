@@ -401,9 +401,22 @@ When loading succeeds, `cpc_ram_rom.sv`:
 
 - asserts `rom_loaded`
 - marks BASIC ROM select `0x00` as present
-- marks AMSDOS ROM select `0x07` as present
+- marks AMSDOS ROM select `0x07` as present for CPC 6128 and CPC 664
+- marks custom ROM select `0x06` as present when `custom.rom` loaded successfully
 
 The bundle layout is documented in `docs/ROM_ASSET_LAYOUT.md`.
+
+The active machine model comes from the Pocket-facing `model_config` register:
+`0 = CPC6128`, `1 = CPC664`, `2 = CPC464`. The Pocket menu treats that setting
+as non-persistent and defaults it back to CPC 6128 on launch. Changing it
+triggers the same short restart pulse used by `Restart Core`, and
+`cpc_machine_pocket.sv` reapplies the selected model whenever the machine
+resets while snapshot loads can still override it with the model encoded in the
+`.sna` file.
+
+The wrapper also keeps the built-in `u765` FDC visible only for CPC 6128 and
+CPC 664. CPC 464 mode deliberately behaves like a stock machine with no
+attached built-in floppy controller.
 
 ### Step 7: The CPC machine is allowed to run
 

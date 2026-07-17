@@ -433,18 +433,22 @@ wire        cpc_vkb_caps;
 wire        cpc_vkb_caps_pulse;
 wire        cpc_menu_inmenu;
 wire        cpc_menu_inmenu_cpc;
+wire [1:0]  cpc_menu_model;
 wire        restart_request_toggle_cpc;
 wire        snapshot_save_request_toggle_cpc;
 reg         restart_request_toggle_cpc_d = 1'b0;
+reg  [1:0]  cpc_menu_model_d = 2'd0;
 reg         snapshot_save_request_toggle_cpc_d = 1'b0;
 reg  [5:0]  cpc_menu_restart_count = 6'd0;
 wire        cpc_menu_restart_pulse = restart_request_toggle_cpc ^ restart_request_toggle_cpc_d;
+wire        cpc_menu_model_changed = (cpc_menu_model != cpc_menu_model_d);
 wire        cpc_snapshot_save_pulse_cpc = snapshot_save_request_toggle_cpc ^ snapshot_save_request_toggle_cpc_d;
 wire        cpc_menu_restart_active = (cpc_menu_restart_count != 6'd0);
 wire        cpc_menu_pause_active = cpc_menu_inmenu_cpc;
 
 synch_3 host_reset_sync_cpc(host_reset_stable_n, host_reset_n_cpc, cpc_clk);
 synch_3 menu_inmenu_sync_cpc(cpc_menu_inmenu, cpc_menu_inmenu_cpc, cpc_clk);
+synch_3 #(.WIDTH(2)) menu_model_sync_cpc(model_config[1:0], cpc_menu_model, cpc_clk);
 synch_3 #(.WIDTH(32)) cont1_key_sync_cpc(cont1_key, cont1_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_key_sync_cpc(cont3_key, cont3_key_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) cont3_joy_sync_cpc(cont3_joy, cont3_joy_cpc, cpc_clk);
@@ -489,6 +493,7 @@ cpc_machine_pocket cpc_machine (
     .loader_done     ( cpc_loader_done ),
     .loader_error    ( cpc_loader_error ),
     .custom_rom_enable ( cpc_custom_rom_enable ),
+    .menu_model      ( cpc_menu_model ),
     .stereo_mix_enable ( cpc_stereo_mix_enable ),
     .capture_ram_rd ( cpc_capture_ram_rd ),
     .capture_ram_word_addr ( cpc_capture_ram_word_addr ),
@@ -752,6 +757,7 @@ end
 always @(posedge cpc_clk) begin
     if (!cpc_reset_n) begin
         restart_request_toggle_cpc_d <= restart_request_toggle_cpc;
+        cpc_menu_model_d <= cpc_menu_model;
         cpc_menu_restart_count <= 6'd0;
         cpc_media_activity_hold <= 23'd0;
         cpc_disk_activity_hold <= 23'd0;
@@ -760,9 +766,10 @@ always @(posedge cpc_clk) begin
         cpc_disk_click_count <= 18'd0;
     end else begin
         restart_request_toggle_cpc_d <= restart_request_toggle_cpc;
+        cpc_menu_model_d <= cpc_menu_model;
         cpc_disk_activity_raw_d <= cpc_disk_activity_raw;
         cpc_sd_ack_d <= cpc_sd_ack;
-        if (cpc_menu_restart_pulse) begin
+        if (cpc_menu_restart_pulse || cpc_menu_model_changed) begin
             cpc_menu_restart_count <= 6'd32;
         end else if (cpc_menu_restart_count != 6'd0) begin
             cpc_menu_restart_count <= cpc_menu_restart_count - 6'd1;

@@ -3,9 +3,9 @@
 //
 // This keeps MiSTer-only transport outside the machine boundary and maps a
 // Pocket-loaded boot.rom bundle into the ROM pages expected by the imported
-// MiSTer motherboard. Snapshot loads can temporarily switch the machine into
-// 64K-model behaviour so 464/664-targeted SNA files see the ROM/RAM shape they
-// expect.
+// MiSTer motherboard. The Pocket menu chooses the default machine model, while
+// snapshot loads can temporarily override it so 464/664-targeted SNA files see
+// the ROM/RAM shape they expect.
 //
 
 `default_nettype none
@@ -30,6 +30,7 @@ module cpc_machine_pocket (
     input  wire        loader_done,
     input  wire        loader_error,
     input  wire        custom_rom_enable,
+    input  wire [1:0]  menu_model,
     input  wire        stereo_mix_enable,
     input  wire        capture_ram_rd,
     input  wire [15:0] capture_ram_word_addr,
@@ -151,7 +152,7 @@ wire        io_wr = iorq & wr;
 wire [3:0]  fdc_sel = {cpu_addr[10], cpu_addr[8], cpu_addr[7], cpu_addr[0]};
 wire        u765_sel = (fdc_sel[3:1] == 3'b010);
 wire [7:0]  u765_dout;
-wire        fdc_bus_enable = rom_loaded;
+wire        fdc_bus_enable = rom_loaded && (machine_model != 2'd2);
 wire [7:0]  cpu_din = memory_cpu_din & ((fdc_bus_enable && u765_sel && io_rd) ? u765_dout : 8'hff);
 reg         motor = 1'b0;
 reg         old_io_wr = 1'b0;
@@ -161,11 +162,19 @@ reg  [7:0]  audio_left_r = 8'd0;
 reg  [7:0]  audio_right_r = 8'd0;
 reg  [1:0]  machine_model = 2'd0;
 
+function automatic [1:0] valid_model(input [1:0] requested);
+begin
+    valid_model = (requested == 2'd3) ? 2'd0 : requested;
+end
+endfunction
+
 // CPC6128 OS reads PPI port B bits 1..3 as active-low distributor jumpers.
 // On this wrapper, 4'b1111 selects the bundled ROM's "Amstrad" string.
 localparam [3:0] CPC_DISTRIBUTOR_AMSTRAD = 4'b1111;
 
 wire machine_reset = reset | key_reset | !rom_loaded | snapshot_busy_reset;
+wire [1:0] selected_menu_model = valid_model(menu_model);
+wire [1:0] selected_sna_model = valid_model(sna_model);
 
 assign cpu_addr_debug = cpu_addr;
 assign mem_rd_debug   = mem_rd;
@@ -325,10 +334,10 @@ Amstrad_motherboard motherboard (
 );
 
 always @(posedge clk) begin
-    if (reset || rom_reset) begin
-        machine_model <= 2'd0;
-    end else if (sna_load) begin
-        machine_model <= sna_model;
+    if (sna_load) begin
+        machine_model <= selected_sna_model;
+    end else if (machine_reset || rom_reset) begin
+        machine_model <= selected_menu_model;
     end
 
     // Keep wrapper-local FDC/audio state aligned with the actual CPC machine

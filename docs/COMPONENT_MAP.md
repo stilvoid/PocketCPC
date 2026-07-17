@@ -24,7 +24,7 @@ Use these as direct references or adaptation patterns where licence permits:
 | Area | Source | Use |
 | --- | --- | --- |
 | CPC machine | `rtl/`, top-level logic behind `Amstrad.sv` | Primary source of CPC behavior. |
-| Model support | `Amstrad.sv` menu/model logic | Current user-facing flow stays centered on CPC 6128; keep 664/464 handling aligned with MiSTer as model-selection work continues. |
+| Model support | `Amstrad.sv` menu/model logic | Keep 6128/664/464 selection and reset-time apply behaviour aligned with MiSTer. |
 | ROM loader mapping | `Amstrad.sv` `ioctl_*` handling | Re-express as APF asset-slot loader. |
 | FDC/u765 + DSK | MiSTer media/disk subsystem | Keep core disk controller, replace MiSTer SD block transport. |
 | Tape/CDT | MiSTer tape loader | Active early tape path. Preserve MiSTer tape behavior where practical and keep Pocket transport logic in the adapter layer. |
