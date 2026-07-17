@@ -14,6 +14,7 @@ Read these first before changing code:
 5. `docs/CPC_IMPORT_MANIFEST.md` if you are touching imported CPC machine files
 6. `docs/ROM_ASSET_LAYOUT.md` if you are changing `boot.rom` loading, packaging, or model ROM assumptions
 7. `TODO.md`
+8. `CHANGELOG.md` when preparing or documenting a release
 
 ## Project Intent
 
@@ -123,6 +124,7 @@ Local PocketCPC code should own only:
 
 - Update `README.md` whenever user-visible behavior, install layout, controls,
   or limitations change.
+- Update `CHANGELOG.md` for every release.
 - Treat `docs/DEVELOPER_GUIDE.md` as the architecture and code-reading guide.
 - Treat `docs/COMPONENT_MAP.md` as the ownership map for reference-core reuse
   decisions.

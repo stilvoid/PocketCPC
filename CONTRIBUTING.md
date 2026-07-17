@@ -16,6 +16,7 @@ Read these first:
 5. `docs/CPC_IMPORT_MANIFEST.md` if you are touching imported CPC machine files
 6. `docs/ROM_ASSET_LAYOUT.md` if you are changing `boot.rom` handling or ROM assumptions
 7. `TODO.md` for the current backlog
+8. `CHANGELOG.md` when preparing a release or release notes
 
 If you plan a large change, open an issue or start a discussion first. Small,
 focused pull requests are much easier to review and validate on hardware.
@@ -35,6 +36,7 @@ Useful contributions include:
 - Preserve MiSTer Amstrad behavior for CPC machine logic wherever practical.
 - Preserve the ZX Spectrum Pocket patterns for Analogue Pocket and APF integration wherever practical.
 - Keep new local HDL limited to adapters and glue unless a divergence is necessary and documented.
+- Use [Semantic Versioning](https://semver.org/) for repo and release version numbers.
 - Preserve upstream file headers and provenance when editing imported or adapted files.
 - Keep user-facing docs in sync with behavior changes.
 - Treat `src/fpga/` as authored FPGA source and `src/pocket/` as the Pocket package template. Generated outputs belong under `build/` and `dist/`, not back in `src/`.
@@ -83,6 +85,7 @@ them on hardware.
 Update these when relevant:
 
 - `README.md` for user-visible behavior, install layout, controls, or limitations
+- `CHANGELOG.md` for release notes and shipped user-visible changes
 - `TODO.md` for follow-up work or known gaps
 - `docs/ROM_ASSET_LAYOUT.md` for any `boot.rom` contract change
 - `docs/CPC_IMPORT_MANIFEST.md` when imported MiSTer-derived file provenance changes
