@@ -12,17 +12,17 @@
           },
           {
             "id": 5,
-            "name": "Fire 2 / Space",
+            "name": "Space",
             "key": "pad_btn_b"
           },
           {
             "id": 6,
-            "name": "Fire 3 / Return",
+            "name": "Return",
             "key": "pad_btn_x"
           },
           {
             "id": 7,
-            "name": "Escape / Delete",
+            "name": "COPY / Delete",
             "key": "pad_btn_y"
           },
           {
@@ -39,6 +39,11 @@
             "id": 14,
             "name": "Virtual Keyboard",
             "key": "pad_btn_select"
+          },
+          {
+            "id": 15,
+            "name": "Escape",
+            "key": "pad_btn_start"
           }
         ]
       }

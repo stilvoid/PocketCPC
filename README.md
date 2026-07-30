@@ -69,6 +69,7 @@ The Pocket menu's `Core Settings` entries do this:
 - `Tape`: mount or change a tape image
 - `Snapshot`: load a snapshot immediately
 - `Display Framing`: choose `Default`, `Tight`, or `Overscan`
+- `D-pad Mode`: choose `Joystick`, `Cursor Keys`, or `QAOP` for normal play
 - `Activity Indicator`: show or hide the disk activity overlay
 - `Disk Access Sound`: enable or disable drive access sound effects
 - `Stereo Mix`: enable or disable the default 25% stereo crossfeed
@@ -128,17 +129,17 @@ normalizes SNA v1 headers to v2 by default and preserves v2/v3 payloads.
 
 Normal play:
 
-- D-pad: joystick directions
+- D-pad: joystick directions by default, or `Cursor Keys` / `QAOP` through `Core Settings` -> `D-pad Mode`
 - `A`: joystick fire 1
-- `B`: joystick fire 2
-- `X`: joystick fire 3
-- `Y`: `Escape`
+- `B`: `Space`
+- `X`: `Return`
+- `Y`: `COPY`
 - `L`: `Shift`
 - `R`: `Ctrl`
 - `Select`: open virtual keyboard
-- `Start`: currently unbound
+- `Start`: `Escape`
 
-Most CPC software expects a one-button joystick. `Fire 2` and `Fire 3` are extra compatibility mappings and may be ignored by many programs.
+Most CPC software expects a one-button joystick. The spare Pocket face buttons are therefore used for common CPC keys instead of extra joystick fire buttons.
 
 Virtual keyboard mode:
 
@@ -149,16 +150,40 @@ Virtual keyboard mode:
 - `Y`: `Delete`
 - `L`: `Shift`
 - `R`: next VKB page
-- `Select`: close virtual keyboard
-- `Start`: currently unbound
+- `Select`: close virtual keyboard, or cancel button-bind mode
+- `Start`: arm button-bind mode for the highlighted key
 
-The VKB includes a shortcut page with one-tap macros for:
+The VKB uses two pages. The second page combines function keys, cursor keys,
+joystick directions/fire buttons, and a right-hand full-text macro column for:
 
 - `|TAPE` + `Return`
 - `|DISC` + `Return`
 - `CAT` + `Return`
 - `RUN"` + `Return`
 - `RUN"DISC` + `Return`
+
+### Session button remap
+
+PocketCPC can temporarily remap `A`, `B`, `X`, `Y`, `L`, `R`, or `Start` to
+any single CPC key or joystick action exposed in the VKB.
+
+Flow:
+
+1. Open the virtual keyboard.
+2. Highlight the CPC key you want.
+3. Press `Start` to arm bind mode for that highlighted key.
+4. Press the Pocket button you want to remap.
+
+While bind mode is armed, the highlighted VKB key changes colour and `Select`
+cancels bind mode instead of closing the VKB. A banner appears while bind mode
+is armed, and a short confirmation message appears after a button is assigned.
+These remaps are session-only and reset when the core resets or restarts. The
+VKB second page also includes joystick directions plus joystick fire buttons
+`1`, `2`, and `3`, so those actions can be tested directly from the VKB or
+assigned to Pocket buttons. Any VKB target that is currently bound is
+highlighted, including the default Pocket mappings when they have not been
+overridden, and moving the selection onto it shows which Pocket button or
+buttons currently point at that target.
 
 Dock USB keyboard support is available through the Analogue Dock, but it is
 still experimental. Most common typing keys and modifiers work, including
@@ -175,7 +200,7 @@ numpad `.` -> `FDot`. On ISO/UK layouts, the `#~` key maps to CPC `]`.
 - Pocket-created Memories currently appear under the `boot` label because the Pocket anchors them to the required `boot.rom` asset rather than runtime-loaded `.dsk`, `.cdt`, or `.sna` media. Converted Memories can use a better label through `scripts/pocketcpc_savestate.py`.
 - Tape support works but should still be treated as experimental.
 - Snapshot loading is supported, but snapshot saving is not currently exposed as a finished feature.
-- There is no finished user-friendly control remapping UI yet.
+- Custom remaps are still session-only, and the physical D-pad can only switch between the built-in `Joystick`, `Cursor Keys`, and `QAOP` presets rather than arbitrary per-button bindings.
 - Only one experimental custom upper ROM slot is currently exposed, fixed as `custom.rom` -> slot `6`.
 
 ## Reporting Issues

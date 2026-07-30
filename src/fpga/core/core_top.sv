@@ -517,6 +517,14 @@ wire        cpc_vkb_shift;
 wire        cpc_vkb_ctrl;
 wire        cpc_vkb_caps;
 wire        cpc_vkb_caps_pulse;
+wire        cpc_vkb_bind_mode;
+wire        cpc_vkb_bind_feedback_active;
+wire [3:0]  cpc_vkb_bind_feedback_button;
+wire [6:0]  cpc_vkb_bind_feedback_index;
+wire [1:0]  cpc_vkb_bind_feedback_page;
+wire [6:0]  cpc_vkb_bound_valid_mask;
+wire [48:0] cpc_vkb_bound_index_bus;
+wire [13:0] cpc_vkb_bound_page_bus;
 wire        cpc_menu_inmenu;
 wire        cpc_menu_inmenu_cpc;
 wire [1:0]  cpc_menu_model;
@@ -563,6 +571,7 @@ synch_3 #(.WIDTH(32)) savestate_debug_cpu_pcsp_sync_74(savestate_debug_cpu_pcsp,
 cpc_pocket_input cpc_input (
     .clk       ( cpc_clk ),
     .reset_n   ( cpc_reset_n ),
+    .dpad_mode ( cpc_dpad_mode ),
     .cont1_key ( cont1_key_cpc ),
     .cont3_key ( cont3_key_cpc ),
     .cont3_joy ( cont3_joy_cpc ),
@@ -576,7 +585,15 @@ cpc_pocket_input cpc_input (
     .vkb_shift ( cpc_vkb_shift ),
     .vkb_ctrl  ( cpc_vkb_ctrl ),
     .vkb_caps  ( cpc_vkb_caps ),
-    .vkb_caps_pulse( cpc_vkb_caps_pulse )
+    .vkb_caps_pulse( cpc_vkb_caps_pulse ),
+    .vkb_bind_mode( cpc_vkb_bind_mode ),
+    .vkb_bind_feedback_active( cpc_vkb_bind_feedback_active ),
+    .vkb_bind_feedback_button( cpc_vkb_bind_feedback_button ),
+    .vkb_bind_feedback_index( cpc_vkb_bind_feedback_index ),
+    .vkb_bind_feedback_page( cpc_vkb_bind_feedback_page ),
+    .vkb_bound_valid_mask( cpc_vkb_bound_valid_mask ),
+    .vkb_bound_index_bus( cpc_vkb_bound_index_bus ),
+    .vkb_bound_page_bus( cpc_vkb_bound_page_bus )
 );
 
 cpc_machine_pocket cpc_machine (
@@ -776,10 +793,9 @@ reg [23:0] cpc_tight_rgb = 24'h000000;
 reg       cpc_tight_de = 1'b0;
 reg [23:0] cpc_default_rgb = 24'h000000;
 reg       cpc_default_de = 1'b0;
-wire [23:0] cpc_overlay_native_rgb;
-wire [23:0] cpc_overlay_zoom_rgb;
-wire        cpc_overlay_native_on;
-wire        cpc_overlay_zoom_on;
+wire [23:0] cpc_overlay_rgb;
+wire        cpc_overlay_on;
+wire        cpc_zoom_selected_next;
 wire        cpc_zoom_selected;
 wire        cpc_zoom_visible;
 wire [23:0] cpc_display_rgb;
@@ -788,18 +804,24 @@ wire [23:0] cpc_video_slot_rgb;
 wire        cpc_display_mode_bit0;
 wire        cpc_display_mode_bit1;
 wire [9:0]  cpc_vkb_zoom_x =
-    (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? CPC_VKB_TIGHT_X[9:0] : CPC_VKB_DEFAULT_X[9:0];
+    (cpc_zoom_preset_video == CPC_ZOOM_PRESET_TIGHT) ? CPC_VKB_TIGHT_X[9:0] : CPC_VKB_DEFAULT_X[9:0];
 wire [8:0]  cpc_vkb_zoom_y =
-    (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? CPC_VKB_TIGHT_Y[8:0] : CPC_VKB_DEFAULT_Y[8:0];
+    (cpc_zoom_preset_video == CPC_ZOOM_PRESET_TIGHT) ? CPC_VKB_TIGHT_Y[8:0] : CPC_VKB_DEFAULT_Y[8:0];
+reg  [9:0]  cpc_vkb_zoom_x_r = CPC_VKB_DEFAULT_X[9:0];
+reg  [8:0]  cpc_vkb_zoom_y_r = CPC_VKB_DEFAULT_Y[8:0];
+reg         cpc_vkb_overlay_active_r = 1'b0;
+reg  [1:0]  cpc_zoom_preset_video = CPC_ZOOM_PRESET_DEFAULT;
+reg         cpc_zoom_selected_r = 1'b0;
 wire        cpc_activity_indicator_enable = interact_config_cpc[2];
 wire        cpc_disk_sound_enable = interact_config_cpc[3];
 wire        cpc_stereo_mix_enable = interact_config_cpc[4];
+wire [1:0]  cpc_dpad_mode = interact_config_cpc[6:5];
 wire        cpc_disk_activity_raw;
 wire        cpc_tape_activity_raw;
 wire        cpc_media_activity_raw;
 wire        cpc_apf_ce = cpc_ce_16;
 wire        cpc_raster_de_now = cpc_rom_loaded && !cpc_rgb_hblank && !cpc_rgb_vblank;
-wire [1:0] cpc_zoom_preset = interact_config_cpc[1:0];
+wire [1:0] cpc_zoom_preset_cfg = interact_config_cpc[1:0];
 wire [10:0] cpc_raster_x_now =
     cpc_raster_de_now ?
     (!cpc_raster_de_prev ? 11'd0 : ({1'b0, cpc_raster_x} + 11'd1)) :
@@ -816,6 +838,10 @@ wire cpc_default_crop_active =
     (cpc_raster_x_now < CPC_RASTER_DEFAULT_RIGHT[10:0]) &&
     ({1'b0, cpc_raster_y} >= CPC_RASTER_DEFAULT_TOP[9:0]) &&
     ({1'b0, cpc_raster_y} < CPC_RASTER_DEFAULT_BOTTOM[9:0]);
+wire        cpc_overlay_input_de = cpc_zoom_selected ? cpc_zoom_visible : cpc_native_de;
+wire [23:0] cpc_overlay_input_rgb = cpc_zoom_selected ? cpc_zoom_rgb : cpc_native_rgb;
+wire [9:0]  cpc_overlay_origin_x = cpc_zoom_selected ? cpc_vkb_zoom_x_r : CPC_VKB_NATIVE_X[9:0];
+wire [8:0]  cpc_overlay_origin_y = cpc_zoom_selected ? cpc_vkb_zoom_y_r : CPC_VKB_NATIVE_Y[8:0];
 wire cpc_overscan_indicator_active =
     cpc_raster_de_now &&
     (cpc_raster_x_now >= (CPC_RASTER_OVERSCAN_LEFT + CPC_ACTIVITY_INDICATOR_X)) &&
@@ -847,8 +873,8 @@ wire        cpc_activity_indicator_on =
     cpc_activity_indicator_enable &&
     cpc_media_activity_visible &&
     (!cpc_zoom_selected ? cpc_overscan_indicator_active :
-     (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_indicator_active :
-     (cpc_zoom_preset == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_indicator_active :
+     (cpc_zoom_preset_video == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_indicator_active :
+     (cpc_zoom_preset_video == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_indicator_active :
      cpc_overscan_indicator_active);
 wire [23:0] cpc_activity_indicator_rgb = 24'hf0f0f0;
 
@@ -875,6 +901,11 @@ always @(posedge cpc_clk) begin
         restart_request_toggle_cpc_d <= restart_request_toggle_cpc;
         cpc_menu_model_d <= cpc_menu_model;
         cpc_menu_restart_count <= 6'd0;
+        cpc_zoom_preset_video <= CPC_ZOOM_PRESET_DEFAULT;
+        cpc_zoom_selected_r <= 1'b0;
+        cpc_vkb_zoom_x_r <= CPC_VKB_DEFAULT_X[9:0];
+        cpc_vkb_zoom_y_r <= CPC_VKB_DEFAULT_Y[8:0];
+        cpc_vkb_overlay_active_r <= 1'b0;
         cpc_media_activity_hold <= 23'd0;
         cpc_disk_activity_hold <= 23'd0;
         cpc_disk_activity_raw_d <= 1'b0;
@@ -883,6 +914,11 @@ always @(posedge cpc_clk) begin
     end else begin
         restart_request_toggle_cpc_d <= restart_request_toggle_cpc;
         cpc_menu_model_d <= cpc_menu_model;
+        cpc_zoom_preset_video <= cpc_zoom_preset_cfg;
+        cpc_zoom_selected_r <= cpc_zoom_selected_next;
+        cpc_vkb_zoom_x_r <= cpc_vkb_zoom_x;
+        cpc_vkb_zoom_y_r <= cpc_vkb_zoom_y;
+        cpc_vkb_overlay_active_r <= cpc_vkb_active & cpc_rom_loaded;
         cpc_disk_activity_raw_d <= cpc_disk_activity_raw;
         cpc_sd_ack_d <= cpc_sd_ack;
         if (cpc_menu_restart_pulse || cpc_menu_model_changed) begin
@@ -1007,8 +1043,8 @@ always @(posedge cpc_clk) begin
         cpc_vsync_prev <= cpc_rgb_vsync;
         cpc_raster_de_prev <= cpc_raster_de_now;
         cpc_zoom_de_prev <=
-            (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_de :
-            (cpc_zoom_preset == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_de :
+            (cpc_zoom_preset_video == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_de :
+            (cpc_zoom_preset_video == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_de :
             cpc_native_de;
     end
 end
@@ -1082,62 +1118,51 @@ always @(*) begin
     end
 end
 
-cpc_virtual_keyboard_overlay cpc_vkb_native_overlay (
+cpc_virtual_keyboard_overlay cpc_vkb_overlay (
     .clk            ( cpc_clk ),
     .reset_n        ( cpc_reset_n ),
     .ce             ( cpc_apf_ce ),
-    .de             ( cpc_native_de ),
+    .de             ( cpc_overlay_input_de ),
     .vs             ( cpc_native_vs ),
-    .rgb_in         ( cpc_native_rgb ),
-    .origin_x       ( CPC_VKB_NATIVE_X[9:0] ),
-    .origin_y       ( CPC_VKB_NATIVE_Y[8:0] ),
-    .active         ( cpc_vkb_active & cpc_rom_loaded & ~cpc_zoom_selected ),
+    .rgb_in         ( cpc_overlay_input_rgb ),
+    .origin_x       ( cpc_overlay_origin_x ),
+    .origin_y       ( cpc_overlay_origin_y ),
+    .active         ( cpc_vkb_overlay_active_r ),
     .selected_index ( cpc_vkb_index ),
     .page           ( cpc_vkb_page ),
     .shift_active   ( cpc_vkb_shift ),
     .ctrl_active    ( cpc_vkb_ctrl ),
     .caps_active    ( cpc_vkb_caps ),
-    .rgb_out        ( cpc_overlay_native_rgb ),
-    .overlay_on     ( cpc_overlay_native_on )
+    .bind_mode      ( cpc_vkb_bind_mode ),
+    .bind_feedback_active ( cpc_vkb_bind_feedback_active ),
+    .bind_feedback_button ( cpc_vkb_bind_feedback_button ),
+    .bind_feedback_index  ( cpc_vkb_bind_feedback_index ),
+    .bind_feedback_page   ( cpc_vkb_bind_feedback_page ),
+    .bound_valid_mask     ( cpc_vkb_bound_valid_mask ),
+    .bound_index_bus      ( cpc_vkb_bound_index_bus ),
+    .bound_page_bus       ( cpc_vkb_bound_page_bus ),
+    .rgb_out        ( cpc_overlay_rgb ),
+    .overlay_on     ( cpc_overlay_on )
 );
 
-cpc_virtual_keyboard_overlay cpc_vkb_zoom_overlay (
-    .clk            ( cpc_clk ),
-    .reset_n        ( cpc_reset_n ),
-    .ce             ( cpc_apf_ce ),
-    .de             ( cpc_zoom_visible ),
-    .vs             ( cpc_native_vs ),
-    .rgb_in         ( cpc_zoom_rgb ),
-    .origin_x       ( cpc_vkb_zoom_x ),
-    .origin_y       ( cpc_vkb_zoom_y ),
-    .active         ( cpc_vkb_active & cpc_rom_loaded & cpc_zoom_selected ),
-    .selected_index ( cpc_vkb_index ),
-    .page           ( cpc_vkb_page ),
-    .shift_active   ( cpc_vkb_shift ),
-    .ctrl_active    ( cpc_vkb_ctrl ),
-    .caps_active    ( cpc_vkb_caps ),
-    .rgb_out        ( cpc_overlay_zoom_rgb ),
-    .overlay_on     ( cpc_overlay_zoom_on )
-);
-
-assign cpc_zoom_selected = (cpc_zoom_preset != CPC_ZOOM_PRESET_OVERSCAN) &
-                           ~cpc_restore_busy_reset &
-                           ~cpc_restore_sna_load;
+assign cpc_zoom_selected_next = (cpc_zoom_preset_video != CPC_ZOOM_PRESET_OVERSCAN) &
+                                ~cpc_restore_busy_reset &
+                                ~cpc_restore_sna_load;
+assign cpc_zoom_selected = cpc_zoom_selected_r;
 assign cpc_zoom_visible =
-    (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_de :
-    (cpc_zoom_preset == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_de :
+    (cpc_zoom_preset_video == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_de :
+    (cpc_zoom_preset_video == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_de :
     cpc_native_de;
 assign cpc_zoom_rgb =
-    (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_rgb :
-    (cpc_zoom_preset == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_rgb :
+    (cpc_zoom_preset_video == CPC_ZOOM_PRESET_TIGHT) ? cpc_tight_rgb :
+    (cpc_zoom_preset_video == CPC_ZOOM_PRESET_DEFAULT) ? cpc_default_rgb :
     cpc_native_rgb;
 assign cpc_display_rgb =
-    (cpc_zoom_selected && cpc_overlay_zoom_on) ? cpc_overlay_zoom_rgb :
-    (!cpc_zoom_selected && cpc_overlay_native_on) ? cpc_overlay_native_rgb :
+    cpc_overlay_on ? cpc_overlay_rgb :
     (cpc_activity_indicator_on ? cpc_activity_indicator_rgb :
      (cpc_zoom_selected ? cpc_zoom_rgb : cpc_native_rgb));
-assign cpc_display_mode_bit0 = (cpc_zoom_preset == CPC_ZOOM_PRESET_TIGHT);
-assign cpc_display_mode_bit1 = (cpc_zoom_preset == CPC_ZOOM_PRESET_DEFAULT);
+assign cpc_display_mode_bit0 = (cpc_zoom_preset_video == CPC_ZOOM_PRESET_TIGHT);
+assign cpc_display_mode_bit1 = (cpc_zoom_preset_video == CPC_ZOOM_PRESET_DEFAULT);
 assign cpc_video_slot_rgb = {9'b0, cpc_display_mode_bit1, cpc_display_mode_bit0, 10'b0, 3'b0};
 
 wire [23:0] apf_video_rgb_next =

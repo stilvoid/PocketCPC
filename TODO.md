@@ -14,16 +14,23 @@ release candidate.
      need adjustment.
 
 2. Review the default Pocket button bindings
-   - The current defaults work, but they need another pass for better
-     out-of-box choices.
+   - The current defaults and VKB-visible highlight state are in a much better
+     place now, but they still need broader play-testing across real CPC games.
    - Recheck the face-button, shoulder-button, and virtual-keyboard shortcuts
      against what CPC software most often expects.
 
 3. Custom CPC key <-> Pocket button mappings
-   - Needed for games that expect keyboard controls instead of joystick input.
-   - Start with a bridge-backed runtime mapping table and a small set of
-     persisted menu presets rather than trying to ship a full arbitrary remap
-     UI in one step.
+   - A first session-only VKB-driven remap flow now exists for
+     `A/B/X/Y/L/R/Start`.
+   - VKB targets now cover both CPC keys and joystick directions/fire buttons,
+     so games can be patched around missing joystick support without needing
+     persisted profiles.
+   - `D-pad Mode` now covers joystick, cursor keys, and `QAOP` for
+     keyboard-only games that do not support joysticks.
+   - The VKB now shows the effective current mappings directly, including
+     default Pocket bindings for any buttons that have not been overridden.
+   - Decide later whether persistent presets are worth the extra bridge/UI
+     complexity; do not assume persistence is required.
 
 4. Persistent `.dsk` writes
    - Disk writes are currently fake-acknowledged for compatibility.

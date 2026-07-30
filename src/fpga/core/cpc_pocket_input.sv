@@ -10,6 +10,7 @@
 module cpc_pocket_input (
     input  wire        clk,
     input  wire        reset_n,
+    input  wire [1:0]  dpad_mode,
     input  wire [31:0] cont1_key,
     input  wire [31:0] cont3_key,
     input  wire [31:0] cont3_joy,
@@ -24,12 +25,24 @@ module cpc_pocket_input (
     output reg         vkb_shift,
     output reg         vkb_ctrl,
     output reg         vkb_caps,
-    output reg         vkb_caps_pulse
+    output reg         vkb_caps_pulse,
+    output reg         vkb_bind_mode,
+    output reg         vkb_bind_feedback_active,
+    output reg  [3:0]  vkb_bind_feedback_button,
+    output reg  [6:0]  vkb_bind_feedback_index,
+    output reg  [1:0]  vkb_bind_feedback_page,
+    output wire [6:0]  vkb_bound_valid_mask,
+    output wire [48:0] vkb_bound_index_bus,
+    output wire [13:0] vkb_bound_page_bus
 );
 
 localparam [7:0] PS2_LSHIFT = 8'h12;
 localparam [7:0] PS2_CTRL   = 8'h14;
+localparam [1:0] DPAD_MODE_JOYSTICK = 2'd0;
+localparam [1:0] DPAD_MODE_CURSOR   = 2'd1;
+localparam [1:0] DPAD_MODE_QAOP     = 2'd2;
 localparam [22:0] VKB_CAPS_PULSE_CYCLES = 23'd7_999_999;
+localparam [26:0] BIND_FEEDBACK_CYCLES = 27'd95_999_999; // ~1.5 s @ 64 MHz
 localparam [20:0] MACRO_PRESS_DELAY_CYCLES   = 21'd1_279_999; // ~20 ms @ 64 MHz
 localparam [20:0] MACRO_RELEASE_DELAY_CYCLES = 21'd255_999;   // ~4 ms  @ 64 MHz
 localparam [24:0] VKB_REPEAT_INITIAL_CYCLES  = 25'd19_199_999; // ~300 ms @ 64 MHz
@@ -66,20 +79,86 @@ reg         macro_release_ctrl = 1'b0;
 reg  [20:0] macro_delay = 21'd0;
 reg  [1:0]  vkb_repeat_dir = 2'd0;
 reg  [24:0] vkb_repeat_timer = 25'd0;
+reg  [26:0] vkb_bind_feedback_timer = 27'd0;
+reg  [15:0] custom_button_valid = 16'd0;
+reg  [15:0] custom_button_is_joy = 16'd0;
+reg  [8:0]  custom_button_ps2 [0:15];
+reg  [6:0]  custom_button_joy [0:15];
+reg  [6:0]  custom_button_vkb_index [0:15];
+reg  [1:0]  custom_button_vkb_page [0:15];
+reg  [8:0]  vkb_bind_ps2 = 9'd0;
+reg  [6:0]  vkb_bind_joy = 7'd0;
+reg         vkb_bind_is_joy = 1'b0;
+wire        dpad_joystick_mode = (dpad_mode == DPAD_MODE_JOYSTICK);
+wire [9:0]  vkb_selected_key_ps2 = map_vkb_index_to_ps2(vkb_index, vkb_page);
+wire [6:0]  vkb_selected_key_joy = map_vkb_index_to_joy(vkb_index, vkb_page);
+wire        vkb_selected_target_valid = vkb_selected_key_ps2[9] || (vkb_selected_key_joy != 7'd0);
+wire [6:0]  custom_joy_a = (custom_button_valid[4]  && custom_button_is_joy[4]  && buttons[4])  ? custom_button_joy[4]  : 7'd0;
+wire [6:0]  custom_joy_b = (custom_button_valid[5]  && custom_button_is_joy[5]  && buttons[5])  ? custom_button_joy[5]  : 7'd0;
+wire [6:0]  custom_joy_x = (custom_button_valid[6]  && custom_button_is_joy[6]  && buttons[6])  ? custom_button_joy[6]  : 7'd0;
+wire [6:0]  custom_joy_y = (custom_button_valid[7]  && custom_button_is_joy[7]  && buttons[7])  ? custom_button_joy[7]  : 7'd0;
+wire [6:0]  custom_joy_l = (custom_button_valid[8]  && custom_button_is_joy[8]  && buttons[8])  ? custom_button_joy[8]  : 7'd0;
+wire [6:0]  custom_joy_r = (custom_button_valid[9]  && custom_button_is_joy[9]  && buttons[9])  ? custom_button_joy[9]  : 7'd0;
+wire [6:0]  custom_joy_start = (custom_button_valid[15] && custom_button_is_joy[15] && buttons[15]) ? custom_button_joy[15] : 7'd0;
+wire [6:0]  custom_joy_mask = custom_joy_a | custom_joy_b | custom_joy_x |
+                              custom_joy_y | custom_joy_l | custom_joy_r |
+                              custom_joy_start;
+wire [6:0]  normal_joy1 = {
+    1'b0, // fire 3 default comes only from explicit remap
+    1'b0, // fire 2 default comes only from explicit remap
+    !custom_button_valid[4] && buttons[4], // A -> fire 1 unless rebound
+    dpad_joystick_mode && buttons[0],
+    dpad_joystick_mode && buttons[1],
+    dpad_joystick_mode && buttons[2],
+    dpad_joystick_mode && buttons[3]
+} | custom_joy_mask;
+wire [6:0]  vkb_virtual_joy1 =
+    (vkb_active && !macro_active && !vkb_bind_mode && buttons[4] && (vkb_selected_key_joy != 7'd0)) ?
+        vkb_selected_key_joy : 7'd0;
+wire [6:0]  effective_bound_index_a = custom_button_valid[4]  ? custom_button_vkb_index[4]  : 7'd23;
+wire [6:0]  effective_bound_index_b = custom_button_valid[5]  ? custom_button_vkb_index[5]  : 7'd64;
+wire [6:0]  effective_bound_index_x = custom_button_valid[6]  ? custom_button_vkb_index[6]  : 7'd28;
+wire [6:0]  effective_bound_index_y = custom_button_valid[7]  ? custom_button_vkb_index[7]  : 7'd62;
+wire [6:0]  effective_bound_index_l = custom_button_valid[8]  ? custom_button_vkb_index[8]  : 7'd45;
+wire [6:0]  effective_bound_index_r = custom_button_valid[9]  ? custom_button_vkb_index[9]  : 7'd60;
+wire [6:0]  effective_bound_index_start = custom_button_valid[15] ? custom_button_vkb_index[15] : 7'd0;
+wire [1:0]  effective_bound_page_a = custom_button_valid[4]  ? custom_button_vkb_page[4]  : 2'd1;
+wire [1:0]  effective_bound_page_b = custom_button_valid[5]  ? custom_button_vkb_page[5]  : 2'd0;
+wire [1:0]  effective_bound_page_x = custom_button_valid[6]  ? custom_button_vkb_page[6]  : 2'd0;
+wire [1:0]  effective_bound_page_y = custom_button_valid[7]  ? custom_button_vkb_page[7]  : 2'd0;
+wire [1:0]  effective_bound_page_l = custom_button_valid[8]  ? custom_button_vkb_page[8]  : 2'd0;
+wire [1:0]  effective_bound_page_r = custom_button_valid[9]  ? custom_button_vkb_page[9]  : 2'd0;
+wire [1:0]  effective_bound_page_start = custom_button_valid[15] ? custom_button_vkb_page[15] : 2'd0;
+
+assign vkb_bound_valid_mask = 7'b1111111;
+assign vkb_bound_index_bus = {
+    effective_bound_index_start,
+    effective_bound_index_r,
+    effective_bound_index_l,
+    effective_bound_index_y,
+    effective_bound_index_x,
+    effective_bound_index_b,
+    effective_bound_index_a
+};
+assign vkb_bound_page_bus = {
+    effective_bound_page_start,
+    effective_bound_page_r,
+    effective_bound_page_l,
+    effective_bound_page_y,
+    effective_bound_page_x,
+    effective_bound_page_b,
+    effective_bound_page_a
+};
 
 // Reuse the MiSTer CPC joystick bit ordering exactly as exposed by joydb.sv:
-// {fire3, fire2, fire1, up, down, left, right}. hid.sv performs its own final
+// {fire3, fire2, fire1, up, down, left, right}. CPC software is effectively
+// one-button, so only fire1 is driven from the Pocket pad and the spare face
+// buttons are free for direct keyboard helpers. hid.sv performs its own final
 // row-local remap after this. Blank joystick activity while the virtual
 // keyboard overlay is open so overlay navigation doesn't leak into software.
-assign joy1 = vkb_active ? 7'd0 : {
-    buttons[6], // X -> fire 3
-    buttons[5], // B -> fire 2
-    buttons[4], // A -> fire 1
-    buttons[0], // D-pad up
-    buttons[1], // D-pad down
-    buttons[2], // D-pad left
-    buttons[3]  // D-pad right
-};
+// The only exception is the highlighted VKB joystick target, which can be
+// tapped directly with A for test and bind setup.
+assign joy1 = vkb_active ? vkb_virtual_joy1 : normal_joy1;
 assign joy2 = 7'd0;
 
 function [9:0] map_vkb_index_to_ps2;
@@ -178,6 +257,11 @@ function [9:0] map_vkb_index_to_ps2;
                     6'd47: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h7A}; // keypad .
                     6'd48: map_vkb_index_to_ps2 = {1'b1, 1'b1, 8'h71}; // CLR
                     6'd49: map_vkb_index_to_ps2 = {1'b1, 1'b0, 8'h66}; // Del
+                    7'd11: map_vkb_index_to_ps2 = 10'd0; // TAP macro
+                    7'd26: map_vkb_index_to_ps2 = 10'd0; // DSC macro
+                    7'd41: map_vkb_index_to_ps2 = 10'd0; // CAT macro
+                    7'd56: map_vkb_index_to_ps2 = 10'd0; // RUN macro
+                    7'd71: map_vkb_index_to_ps2 = 10'd0; // RDS macro
                     default: map_vkb_index_to_ps2 = 10'd0;
                 endcase
             end
@@ -210,6 +294,26 @@ function [9:0] map_vkb_index_to_ps2;
             end
             default: map_vkb_index_to_ps2 = 10'd0;
         endcase
+    end
+endfunction
+
+function [6:0] map_vkb_index_to_joy;
+    input [6:0] key_index;
+    input [1:0] page;
+    begin
+        map_vkb_index_to_joy = 7'd0;
+        if (page == 2'd1) begin
+            case (key_index)
+                7'd8:  map_vkb_index_to_joy = 7'b0001000; // joy up
+                7'd22: map_vkb_index_to_joy = 7'b0000010; // joy left
+                7'd23: map_vkb_index_to_joy = 7'b0010000; // joy fire 1
+                7'd24: map_vkb_index_to_joy = 7'b0000001; // joy right
+                7'd38: map_vkb_index_to_joy = 7'b0000100; // joy down
+                7'd52: map_vkb_index_to_joy = 7'b0100000; // joy fire 2
+                7'd53: map_vkb_index_to_joy = 7'b1000000; // joy fire 3
+                default: map_vkb_index_to_joy = 7'd0;
+            endcase
+        end
     end
 endfunction
 
@@ -358,22 +462,56 @@ function automatic [9:0] map_dock_modifier_to_ps2;
     end
 endfunction
 
+function [9:0] map_normal_dpad_to_ps2;
+    input [3:0] button;
+    input [1:0] mode;
+    begin
+        map_normal_dpad_to_ps2 = 10'd0;
+        case (mode)
+            DPAD_MODE_CURSOR: begin
+                case (button)
+                    4'd0: map_normal_dpad_to_ps2 = {1'b1, 1'b1, 8'h75}; // Up
+                    4'd1: map_normal_dpad_to_ps2 = {1'b1, 1'b1, 8'h72}; // Down
+                    4'd2: map_normal_dpad_to_ps2 = {1'b1, 1'b1, 8'h6B}; // Left
+                    4'd3: map_normal_dpad_to_ps2 = {1'b1, 1'b1, 8'h74}; // Right
+                    default: map_normal_dpad_to_ps2 = 10'd0;
+                endcase
+            end
+            DPAD_MODE_QAOP: begin
+                case (button)
+                    4'd0: map_normal_dpad_to_ps2 = {1'b1, 1'b0, 8'h15}; // Q
+                    4'd1: map_normal_dpad_to_ps2 = {1'b1, 1'b0, 8'h1C}; // A
+                    4'd2: map_normal_dpad_to_ps2 = {1'b1, 1'b0, 8'h44}; // O
+                    4'd3: map_normal_dpad_to_ps2 = {1'b1, 1'b0, 8'h4D}; // P
+                    default: map_normal_dpad_to_ps2 = 10'd0;
+                endcase
+            end
+            default: map_normal_dpad_to_ps2 = 10'd0;
+        endcase
+    end
+endfunction
+
 function [9:0] map_normal_button_to_ps2;
     input [3:0] button;
     begin
-        case (button)
-            4'd0: map_normal_button_to_ps2 = 10'd0; // D-pad up handled as joystick
-            4'd1: map_normal_button_to_ps2 = 10'd0; // D-pad down handled as joystick
-            4'd2: map_normal_button_to_ps2 = 10'd0; // D-pad left handled as joystick
-            4'd3: map_normal_button_to_ps2 = 10'd0; // D-pad right handled as joystick
-            4'd4: map_normal_button_to_ps2 = 10'd0; // A handled as joystick fire 1
-            4'd5: map_normal_button_to_ps2 = 10'd0; // B handled as joystick fire 2
-            4'd6: map_normal_button_to_ps2 = 10'd0; // X handled as joystick fire 3
-            4'd7: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h76}; // Y           -> Escape
-            4'd8: map_normal_button_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // L       -> Shift
-            4'd9: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h14}; // R           -> Ctrl
-            default: map_normal_button_to_ps2 = 10'd0;
-        endcase
+        if (custom_button_valid[button] && !custom_button_is_joy[button]) begin
+            map_normal_button_to_ps2 = {1'b1, custom_button_ps2[button]};
+        end else begin
+            case (button)
+                4'd0: map_normal_button_to_ps2 = map_normal_dpad_to_ps2(button, dpad_mode);
+                4'd1: map_normal_button_to_ps2 = map_normal_dpad_to_ps2(button, dpad_mode);
+                4'd2: map_normal_button_to_ps2 = map_normal_dpad_to_ps2(button, dpad_mode);
+                4'd3: map_normal_button_to_ps2 = map_normal_dpad_to_ps2(button, dpad_mode);
+                4'd4: map_normal_button_to_ps2 = 10'd0; // A handled as joystick fire 1
+                4'd5: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // B           -> Space
+                4'd6: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // X           -> Return
+                4'd7: map_normal_button_to_ps2 = {1'b1, 1'b1, 8'h70}; // Y           -> COPY
+                4'd8: map_normal_button_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // L       -> Shift
+                4'd9: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h14}; // R           -> Ctrl
+                4'd15: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h76}; // Start      -> Escape
+                default: map_normal_button_to_ps2 = 10'd0;
+            endcase
+        end
     end
 endfunction
 
@@ -392,11 +530,27 @@ function [9:0] map_vkb_button_to_ps2;
     end
 endfunction
 
+function bindable_normal_button;
+    input [3:0] button;
+    begin
+        case (button)
+            4'd4, 4'd5, 4'd6, 4'd7, 4'd8, 4'd9, 4'd15: bindable_normal_button = 1'b1;
+            default: bindable_normal_button = 1'b0;
+        endcase
+    end
+endfunction
+
 function vkb_is_macro_key;
     input [6:0] key_index;
     input [1:0] page;
     begin
-        vkb_is_macro_key = (page == 2'd3) && (key_index <= 7'd4);
+        vkb_is_macro_key = 1'b0;
+        if (page == 2'd1) begin
+            case (key_index)
+                7'd11, 7'd26, 7'd41, 7'd56, 7'd71: vkb_is_macro_key = 1'b1;
+                default: vkb_is_macro_key = 1'b0;
+            endcase
+        end
     end
 endfunction
 
@@ -404,8 +558,17 @@ function [2:0] vkb_macro_id;
     input [6:0] key_index;
     input [1:0] page;
     begin
-        if ((page == 2'd3) && (key_index <= 7'd4)) vkb_macro_id = key_index[2:0] + 3'd1;
-        else vkb_macro_id = 3'd0;
+        vkb_macro_id = 3'd0;
+        if (page == 2'd1) begin
+            case (key_index)
+                7'd11: vkb_macro_id = 3'd1;
+                7'd26: vkb_macro_id = 3'd2;
+                7'd41: vkb_macro_id = 3'd3;
+                7'd56: vkb_macro_id = 3'd4;
+                7'd71: vkb_macro_id = 3'd5;
+                default: vkb_macro_id = 3'd0;
+            endcase
+        end
     end
 endfunction
 
@@ -578,15 +741,27 @@ function [6:0] vkb_clamp_index;
         end else if (page == 2'd1) begin
             case (key_index)
                 7'd3: vkb_clamp_index = 7'd2;
-                7'd5, 7'd6, 7'd7, 7'd8, 7'd9, 7'd10, 7'd11, 7'd12, 7'd13, 7'd14: vkb_clamp_index = 7'd4;
-                7'd21, 7'd22, 7'd23, 7'd24, 7'd25, 7'd26, 7'd27, 7'd28, 7'd29: vkb_clamp_index = 7'd20;
-                7'd33: vkb_clamp_index = 7'd32;
-                7'd35, 7'd36, 7'd37, 7'd38, 7'd39, 7'd40, 7'd41, 7'd42, 7'd43, 7'd44: vkb_clamp_index = 7'd34;
+                7'd5, 7'd6: vkb_clamp_index = 7'd4;
+                7'd7, 7'd9, 7'd10: vkb_clamp_index = 7'd8;
+                7'd12, 7'd13, 7'd14: vkb_clamp_index = 7'd11;
+                7'd21: vkb_clamp_index = 7'd20;
+                7'd25: vkb_clamp_index = 7'd24;
+                7'd27, 7'd28, 7'd29: vkb_clamp_index = 7'd26;
+                7'd33: vkb_clamp_index = 7'd34;
+                7'd35, 7'd36, 7'd37, 7'd39: vkb_clamp_index = 7'd38;
+                7'd40, 7'd42, 7'd43, 7'd44: vkb_clamp_index = 7'd41;
+                7'd50: vkb_clamp_index = 7'd49;
+                7'd51: vkb_clamp_index = 7'd52;
+                7'd54: vkb_clamp_index = 7'd53;
+                7'd55, 7'd57, 7'd58, 7'd59: vkb_clamp_index = 7'd56;
+                7'd60, 7'd61, 7'd62, 7'd63, 7'd64, 7'd65, 7'd66, 7'd67, 7'd68, 7'd69, 7'd70, 7'd72, 7'd73, 7'd74:
+                    vkb_clamp_index = 7'd71;
                 default: if (key_index > vkb_page_last_index(page)) vkb_clamp_index = vkb_page_last_index(page);
             endcase
         end else if (page == 2'd2) begin
             case (key_index)
                 7'd6: vkb_clamp_index = 7'd5;
+                7'd22, 7'd23, 7'd24, 7'd25, 7'd26, 7'd27, 7'd28, 7'd29: vkb_clamp_index = 7'd21;
                 default: if (key_index > vkb_page_last_index(page)) vkb_clamp_index = vkb_page_last_index(page);
             endcase
         end else if (key_index > vkb_page_last_index(page)) begin
@@ -600,8 +775,8 @@ function [6:0] vkb_page_last_index;
     begin
         case (page)
             2'd0: vkb_page_last_index = 7'd74;
-            2'd1: vkb_page_last_index = 7'd49;
-            2'd2: vkb_page_last_index = 7'd21;
+            2'd1: vkb_page_last_index = 7'd71;
+            2'd2: vkb_page_last_index = 7'd36;
             default: vkb_page_last_index = 7'd4;
         endcase
     end
@@ -612,8 +787,8 @@ function [6:0] vkb_page_last_row_start;
     begin
         case (page)
             2'd0: vkb_page_last_row_start = 7'd60;
-            2'd1: vkb_page_last_row_start = 7'd45;
-            2'd2: vkb_page_last_row_start = 7'd15;
+            2'd1: vkb_page_last_row_start = 7'd60;
+            2'd2: vkb_page_last_row_start = 7'd30;
             default: vkb_page_last_row_start = 7'd0;
         endcase
     end
@@ -692,25 +867,37 @@ function [6:0] vkb_move_left;
             end
             2'd1: begin
                 case (key_index)
-                    7'd0: vkb_move_left = 7'd4;
+                    7'd0: vkb_move_left = 7'd11;
                     7'd1: vkb_move_left = 7'd0;
                     7'd2: vkb_move_left = 7'd1;
                     7'd4: vkb_move_left = 7'd2;
-                    7'd15: vkb_move_left = 7'd20;
+                    7'd8: vkb_move_left = 7'd4;
+                    7'd11: vkb_move_left = 7'd8;
+                    7'd15: vkb_move_left = 7'd26;
                     7'd16: vkb_move_left = 7'd15;
                     7'd17: vkb_move_left = 7'd16;
                     7'd18: vkb_move_left = 7'd17;
                     7'd19: vkb_move_left = 7'd18;
                     7'd20: vkb_move_left = 7'd19;
-                    7'd30: vkb_move_left = 7'd34;
+                    7'd22: vkb_move_left = 7'd20;
+                    7'd23: vkb_move_left = 7'd22;
+                    7'd24: vkb_move_left = 7'd23;
+                    7'd26: vkb_move_left = 7'd24;
+                    7'd30: vkb_move_left = 7'd41;
                     7'd31: vkb_move_left = 7'd30;
                     7'd32: vkb_move_left = 7'd31;
                     7'd34: vkb_move_left = 7'd32;
-                    7'd45: vkb_move_left = 7'd49;
+                    7'd38: vkb_move_left = 7'd34;
+                    7'd41: vkb_move_left = 7'd38;
+                    7'd45: vkb_move_left = 7'd56;
                     7'd46: vkb_move_left = 7'd45;
                     7'd47: vkb_move_left = 7'd46;
                     7'd48: vkb_move_left = 7'd47;
                     7'd49: vkb_move_left = 7'd48;
+                    7'd52: vkb_move_left = 7'd49;
+                    7'd53: vkb_move_left = 7'd52;
+                    7'd56: vkb_move_left = 7'd53;
+                    7'd71: vkb_move_left = 7'd71;
                     default: vkb_move_left = key_index;
                 endcase
             end
@@ -737,6 +924,13 @@ function [6:0] vkb_move_left;
                     7'd19: vkb_move_left = 7'd18;
                     7'd20: vkb_move_left = 7'd19;
                     7'd21: vkb_move_left = 7'd20;
+                    7'd30: vkb_move_left = 7'd36;
+                    7'd31: vkb_move_left = 7'd30;
+                    7'd32: vkb_move_left = 7'd31;
+                    7'd33: vkb_move_left = 7'd32;
+                    7'd34: vkb_move_left = 7'd33;
+                    7'd35: vkb_move_left = 7'd34;
+                    7'd36: vkb_move_left = 7'd35;
                     default: vkb_move_left = key_index;
                 endcase
             end
@@ -831,22 +1025,34 @@ function [6:0] vkb_move_right;
                     7'd0: vkb_move_right = 7'd1;
                     7'd1: vkb_move_right = 7'd2;
                     7'd2: vkb_move_right = 7'd4;
-                    7'd4: vkb_move_right = 7'd0;
+                    7'd4: vkb_move_right = 7'd8;
+                    7'd8: vkb_move_right = 7'd11;
+                    7'd11: vkb_move_right = 7'd0;
                     7'd15: vkb_move_right = 7'd16;
                     7'd16: vkb_move_right = 7'd17;
                     7'd17: vkb_move_right = 7'd18;
                     7'd18: vkb_move_right = 7'd19;
                     7'd19: vkb_move_right = 7'd20;
-                    7'd20: vkb_move_right = 7'd15;
+                    7'd20: vkb_move_right = 7'd22;
+                    7'd22: vkb_move_right = 7'd23;
+                    7'd23: vkb_move_right = 7'd24;
+                    7'd24: vkb_move_right = 7'd26;
+                    7'd26: vkb_move_right = 7'd15;
                     7'd30: vkb_move_right = 7'd31;
                     7'd31: vkb_move_right = 7'd32;
                     7'd32: vkb_move_right = 7'd34;
-                    7'd34: vkb_move_right = 7'd30;
+                    7'd34: vkb_move_right = 7'd38;
+                    7'd38: vkb_move_right = 7'd41;
+                    7'd41: vkb_move_right = 7'd30;
                     7'd45: vkb_move_right = 7'd46;
                     7'd46: vkb_move_right = 7'd47;
                     7'd47: vkb_move_right = 7'd48;
                     7'd48: vkb_move_right = 7'd49;
-                    7'd49: vkb_move_right = 7'd45;
+                    7'd49: vkb_move_right = 7'd52;
+                    7'd52: vkb_move_right = 7'd53;
+                    7'd53: vkb_move_right = 7'd56;
+                    7'd56: vkb_move_right = 7'd45;
+                    7'd71: vkb_move_right = 7'd71;
                     default: vkb_move_right = key_index;
                 endcase
             end
@@ -873,6 +1079,13 @@ function [6:0] vkb_move_right;
                     7'd19: vkb_move_right = 7'd20;
                     7'd20: vkb_move_right = 7'd21;
                     7'd21: vkb_move_right = 7'd15;
+                    7'd30: vkb_move_right = 7'd31;
+                    7'd31: vkb_move_right = 7'd32;
+                    7'd32: vkb_move_right = 7'd33;
+                    7'd33: vkb_move_right = 7'd34;
+                    7'd34: vkb_move_right = 7'd35;
+                    7'd35: vkb_move_right = 7'd36;
+                    7'd36: vkb_move_right = 7'd30;
                     default: vkb_move_right = key_index;
                 endcase
             end
@@ -908,22 +1121,19 @@ function [6:0] vkb_wrap_up_simple;
             end
             2'd1: begin
                 case (key_index)
-                    7'd0: vkb_wrap_up_simple = 7'd45;
-                    7'd1: vkb_wrap_up_simple = 7'd46;
-                    7'd2: vkb_wrap_up_simple = 7'd47;
-                    7'd4: vkb_wrap_up_simple = 7'd49;
+                    7'd0, 7'd1, 7'd2, 7'd4, 7'd8, 7'd11: vkb_wrap_up_simple = 7'd71;
                     default: vkb_wrap_up_simple = key_index;
                 endcase
             end
             2'd2: begin
                 case (key_index)
-                    7'd0: vkb_wrap_up_simple = 7'd15;
-                    7'd1: vkb_wrap_up_simple = 7'd16;
-                    7'd2: vkb_wrap_up_simple = 7'd17;
-                    7'd3: vkb_wrap_up_simple = 7'd18;
-                    7'd4: vkb_wrap_up_simple = 7'd19;
-                    7'd5: vkb_wrap_up_simple = 7'd20;
-                    7'd7, 7'd8, 7'd9, 7'd10, 7'd11, 7'd12, 7'd13, 7'd14: vkb_wrap_up_simple = 7'd21;
+                    7'd0: vkb_wrap_up_simple = 7'd30;
+                    7'd1: vkb_wrap_up_simple = 7'd31;
+                    7'd2: vkb_wrap_up_simple = 7'd32;
+                    7'd3: vkb_wrap_up_simple = 7'd33;
+                    7'd4: vkb_wrap_up_simple = 7'd34;
+                    7'd5: vkb_wrap_up_simple = 7'd35;
+                    7'd7, 7'd8, 7'd9, 7'd10, 7'd11, 7'd12, 7'd13, 7'd14: vkb_wrap_up_simple = 7'd36;
                     default: vkb_wrap_up_simple = key_index;
                 endcase
             end
@@ -949,23 +1159,19 @@ function [6:0] vkb_wrap_down_simple;
             end
             2'd1: begin
                 case (key_index)
-                    7'd45: vkb_wrap_down_simple = 7'd0;
-                    7'd46: vkb_wrap_down_simple = 7'd1;
-                    7'd47: vkb_wrap_down_simple = 7'd2;
-                    7'd48: vkb_wrap_down_simple = 7'd2;
-                    7'd49: vkb_wrap_down_simple = 7'd4;
+                    7'd71: vkb_wrap_down_simple = 7'd11;
                     default: vkb_wrap_down_simple = key_index;
                 endcase
             end
             2'd2: begin
                 case (key_index)
-                    7'd15: vkb_wrap_down_simple = 7'd0;
-                    7'd16: vkb_wrap_down_simple = 7'd1;
-                    7'd17: vkb_wrap_down_simple = 7'd2;
-                    7'd18: vkb_wrap_down_simple = 7'd3;
-                    7'd19: vkb_wrap_down_simple = 7'd4;
-                    7'd20: vkb_wrap_down_simple = 7'd5;
-                    7'd21: vkb_wrap_down_simple = 7'd5;
+                    7'd30: vkb_wrap_down_simple = 7'd0;
+                    7'd31: vkb_wrap_down_simple = 7'd1;
+                    7'd32: vkb_wrap_down_simple = 7'd2;
+                    7'd33: vkb_wrap_down_simple = 7'd3;
+                    7'd34: vkb_wrap_down_simple = 7'd4;
+                    7'd35: vkb_wrap_down_simple = 7'd5;
+                    7'd36: vkb_wrap_down_simple = 7'd7;
                     default: vkb_wrap_down_simple = key_index;
                 endcase
             end
@@ -979,6 +1185,7 @@ reg [3:0]  selected_button;
 reg [9:0]  selected_ps2;
 reg        selected_valid;
 integer    scan_idx;
+integer    bind_reset_idx;
 
 wire [7:0] dock_active_code = dock_keyboard_code_at(dock_keyboard_codes_active, dock_keyboard_index);
 wire [7:0] dock_report_code = dock_keyboard_code_at(dock_keyboard_codes_sample, dock_keyboard_index);
@@ -1013,7 +1220,7 @@ reg         macro_ps2_valid;
 reg  [5:0]  macro_body_step;
 
 always @(*) begin
-    next_pending    = macro_active ? 16'd0 : (pending | changed);
+    next_pending    = (macro_active || vkb_bind_mode) ? 16'd0 : (pending | changed);
     selected_button = 4'd0;
     selected_ps2    = 10'd0;
     selected_valid  = 1'b0;
@@ -1021,10 +1228,8 @@ always @(*) begin
     macro_ps2_valid = 1'b0;
     macro_body_step = 6'd0;
 
-    // Select toggles the on-screen keyboard locally. Start is intentionally
-    // left unbound here so restart can live behind the Pocket menu instead.
+    // Select toggles the on-screen keyboard locally.
     next_pending[14] = 1'b0;
-    next_pending[15] = 1'b0;
 
     if (vkb_active) begin
         next_pending[3:0] = 4'b0000;
@@ -1085,6 +1290,15 @@ always @(posedge clk) begin
         vkb_ctrl     <= 1'b0;
         vkb_caps     <= 1'b0;
         vkb_caps_pulse <= 1'b0;
+        vkb_bind_mode <= 1'b0;
+        vkb_bind_feedback_active <= 1'b0;
+        vkb_bind_feedback_button <= 4'd0;
+        vkb_bind_feedback_index <= 7'd0;
+        vkb_bind_feedback_page <= 2'd0;
+        vkb_bind_feedback_timer <= 27'd0;
+        vkb_bind_ps2 <= 9'd0;
+        vkb_bind_joy <= 7'd0;
+        vkb_bind_is_joy <= 1'b0;
         vkb_a_ps2    <= {1'b0, 8'h16};
         vkb_caps_pulse_timer <= 23'd0;
         dock_keyboard_mods_active  <= 8'd0;
@@ -1101,6 +1315,14 @@ always @(posedge clk) begin
         macro_delay <= 21'd0;
         vkb_repeat_dir <= 2'd0;
         vkb_repeat_timer <= 25'd0;
+        custom_button_valid <= 16'd0;
+        custom_button_is_joy <= 16'd0;
+        for (bind_reset_idx = 0; bind_reset_idx < 16; bind_reset_idx = bind_reset_idx + 1) begin
+            custom_button_ps2[bind_reset_idx] <= 9'd0;
+            custom_button_joy[bind_reset_idx] <= 7'd0;
+            custom_button_vkb_index[bind_reset_idx] <= 7'd0;
+            custom_button_vkb_page[bind_reset_idx] <= 2'd0;
+        end
     end else begin
         buttons_prev <= buttons;
         pending      <= next_pending;
@@ -1113,19 +1335,34 @@ always @(posedge clk) begin
             end
         end
 
+        if (vkb_bind_feedback_active) begin
+            if (vkb_bind_feedback_timer == 27'd0) begin
+                vkb_bind_feedback_active <= 1'b0;
+            end else begin
+                vkb_bind_feedback_timer <= vkb_bind_feedback_timer - 27'd1;
+            end
+        end
+
         begin
             if (pressed[14]) begin
-                vkb_active <= ~vkb_active;
-                pending    <= 16'd0;
-                macro_active <= 1'b0;
-                macro_step <= 6'd0;
-                macro_release_shift <= 1'b0;
-                macro_release_ctrl <= 1'b0;
-                macro_delay <= 21'd0;
-                vkb_repeat_timer <= 25'd0;
-                if (vkb_active && vkb_shift) begin
-                    vkb_shift <= 1'b0;
-                    ps2_key <= {~ps2_key[10], 1'b0, 1'b0, PS2_LSHIFT};
+                if (vkb_bind_mode) begin
+                    vkb_bind_mode <= 1'b0;
+                    vkb_bind_ps2 <= 9'd0;
+                    vkb_bind_joy <= 7'd0;
+                    vkb_bind_is_joy <= 1'b0;
+                end else begin
+                    vkb_active <= ~vkb_active;
+                    pending    <= 16'd0;
+                    macro_active <= 1'b0;
+                    macro_step <= 6'd0;
+                    macro_release_shift <= 1'b0;
+                    macro_release_ctrl <= 1'b0;
+                    macro_delay <= 21'd0;
+                    vkb_repeat_timer <= 25'd0;
+                    if (vkb_active && vkb_shift) begin
+                        vkb_shift <= 1'b0;
+                        ps2_key <= {~ps2_key[10], 1'b0, 1'b0, PS2_LSHIFT};
+                    end
                 end
             end
 
@@ -1152,7 +1389,16 @@ always @(posedge clk) begin
                 vkb_repeat_timer <= VKB_REPEAT_RATE_CYCLES;
             end
 
-            if (vkb_active && !macro_active) begin
+            if (vkb_active && !macro_active && !vkb_bind_mode) begin
+                if (pressed[15] && vkb_selected_target_valid && !vkb_is_macro_key(vkb_index, vkb_page)) begin
+                    vkb_bind_mode <= 1'b1;
+                    vkb_bind_feedback_active <= 1'b0;
+                    vkb_bind_feedback_timer <= 27'd0;
+                    vkb_bind_ps2 <= vkb_selected_key_ps2[8:0];
+                    vkb_bind_joy <= vkb_selected_key_joy;
+                    vkb_bind_is_joy <= (vkb_selected_key_joy != 7'd0);
+                    pending <= 16'd0;
+                end
                 if (pressed[8]) begin
                     vkb_shift <= ~vkb_shift;
                     ps2_key <= {~ps2_key[10], !vkb_shift, 1'b0, PS2_LSHIFT};
@@ -1184,8 +1430,8 @@ always @(posedge clk) begin
                     if (vkb_ctrl) vkb_ctrl <= 1'b0;
                 end
                 if (pressed[9]) begin
-                    if (vkb_page == 2'd3) vkb_page <= 2'd0;
-                    else vkb_page <= vkb_page + 2'd1;
+                    if (vkb_page == 2'd0) vkb_page <= 2'd1;
+                    else vkb_page <= 2'd0;
                     vkb_index <= 7'd0;
                 end
 
@@ -1199,6 +1445,28 @@ always @(posedge clk) begin
                 end
                 if (vkb_nav_left) vkb_index <= vkb_move_left(vkb_index, vkb_page);
                 if (vkb_nav_right) vkb_index <= vkb_move_right(vkb_index, vkb_page);
+            end
+
+            if (vkb_bind_mode) begin
+                for (bind_reset_idx = 0; bind_reset_idx < 16; bind_reset_idx = bind_reset_idx + 1) begin
+                    if (pressed[bind_reset_idx] && bindable_normal_button(bind_reset_idx[3:0])) begin
+                        custom_button_valid[bind_reset_idx] <= 1'b1;
+                        custom_button_is_joy[bind_reset_idx] <= vkb_bind_is_joy;
+                        custom_button_ps2[bind_reset_idx] <= vkb_bind_ps2;
+                        custom_button_joy[bind_reset_idx] <= vkb_bind_joy;
+                        custom_button_vkb_index[bind_reset_idx] <= vkb_index;
+                        custom_button_vkb_page[bind_reset_idx] <= vkb_page;
+                        vkb_bind_mode <= 1'b0;
+                        vkb_bind_feedback_active <= 1'b1;
+                        vkb_bind_feedback_button <= bind_reset_idx[3:0];
+                        vkb_bind_feedback_index <= vkb_index;
+                        vkb_bind_feedback_page <= vkb_page;
+                        vkb_bind_feedback_timer <= BIND_FEEDBACK_CYCLES;
+                        vkb_bind_ps2 <= 9'd0;
+                        vkb_bind_joy <= 7'd0;
+                        vkb_bind_is_joy <= 1'b0;
+                    end
+                end
             end
 
             if (macro_active && (macro_delay != 21'd0)) begin
