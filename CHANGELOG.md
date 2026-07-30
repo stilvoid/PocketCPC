@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.0
+
+- Added experimental Pocket `Memories` support and sleep/wake restore using the same savestate path.
+- Added `scripts/pocketcpc_savestate.py` to convert between PocketCPC `.sta` Memories and CPC `.sna` snapshots.
+- Added `D-pad Mode` settings for `Joystick`, `Cursor Keys`, and `QAOP`.
+- Added a virtual-keyboard-driven session remap flow so `A`, `B`, `X`, `Y`, `L`, `R`, and `Start` can be rebound to CPC keys or joystick actions until the next reset.
+- Improved the virtual keyboard so it exposes joystick actions on-page, highlights active bindings, and shows remap state more clearly.
+- Changed the default Pocket controls to more useful CPC-oriented bindings, including `B` as easy-reach joystick-up plus direct `Space`, `Return`, and `Escape` mappings on face buttons.
+- Expanded the developer and architecture docs for input handling, savestates, and media transport ahead of release.
+
 ## v0.2.0
 
 - Added Pocket menu machine model selection for `CPC 6128`, `CPC 664`, and `CPC 464`.

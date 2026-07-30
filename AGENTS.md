@@ -13,9 +13,11 @@ Read these first before changing code:
 4. `docs/COMPONENT_MAP.md`
 5. `docs/CPC_IMPORT_MANIFEST.md` if you are touching imported CPC machine files
 6. `docs/ROM_ASSET_LAYOUT.md` if you are changing `boot.rom` loading, packaging, or model ROM assumptions
-7. `docs/SAVESTATE_DEVLOG.md` if you are touching Pocket savestates or Memories
-8. `TODO.md`
-9. `CHANGELOG.md` when preparing or documenting a release
+7. `docs/SAVESTATE_ARCHITECTURE.md` if you are touching Pocket savestates or Memories
+8. `docs/MEDIA_TRANSPORT_ARCHITECTURE.md` if you are touching ROM, disk, tape, or snapshot transport
+9. `docs/INPUT_ARCHITECTURE.md` if you are touching controls, the VKB, or Dock keyboard handling
+11. `TODO.md`
+12. `CHANGELOG.md` when preparing or documenting a release
 
 ## Project Intent
 
@@ -84,6 +86,10 @@ Local PocketCPC code should own only:
 
 - Avoid rebuilding or reinstalling artifacts whose hardware behavior is already
   known.
+- `make validate` is allowed as the default cheap HDL sanity check. It runs
+  Quartus Analysis & Elaboration only, and is the preferred pre-handoff check
+  for syntax, hierarchy, project coverage, and port/assignment mistakes when a
+  human has not explicitly asked for a full build.
 - For routine feature work, do not start `make build`, `make report`,
   `make dist`, or other Quartus-driven flows unless a human explicitly asks for
   that validation.
@@ -125,7 +131,9 @@ Local PocketCPC code should own only:
   under `src/fpga/cpc/`.
 - Disk writes are currently acknowledged but not persisted. Keep README and
   release notes explicit about that.
-- `sleep_supported` stays `false` until the core has real sleep support.
+- `sleep_supported` is currently enabled and hardware-verified. Keep README and
+  `TODO.md` precise about what is fully supported versus which broader
+  savestate/media edge cases still need validation.
 - Dock USB keyboard support is experimental. Keep README and `TODO.md` honest
   about missing mappings or behavior gaps.
 
@@ -141,6 +149,12 @@ Local PocketCPC code should own only:
   MiSTer-derived files.
 - Treat `docs/ROM_ASSET_LAYOUT.md` as the contract for the required
   `boot.rom` bundle.
+- Treat `docs/SAVESTATE_ARCHITECTURE.md` as the design note for Pocket
+  `Memories` and sleep/wake support.
+- Treat `docs/MEDIA_TRANSPORT_ARCHITECTURE.md` as the design note for APF
+  startup assets and runtime media transport.
+- Treat `docs/INPUT_ARCHITECTURE.md` as the design note for Pocket controls,
+  the VKB, remapping, and Dock keyboard handling.
 - Update `TODO.md` whenever known follow-up work changes.
 - Prefer neutral repo docs such as `AGENTS.md`, `README.md`, and `docs/*`
   instead of tool-specific workflow files.

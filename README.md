@@ -123,7 +123,9 @@ filename, and uses a blank thumbnail. Pass `--asset-name` if you want a
 different generated label. You can still pass `--template existing.sta` if you
 want to preserve the Pocket-side wrapper, metadata, and thumbnail from a real
 PocketCPC Memory while replacing only the embedded snapshot payload. The script
-normalizes SNA v1 headers to v2 by default and preserves v2/v3 payloads.
+normalizes SNA v1 headers to v2 by default and preserves v2/v3 payloads; the
+current Pocket savestate path itself uses a v3-compatible payload because the
+extra timing state was needed for reliable sleep/wake restore.
 
 ### Default controls
 
@@ -196,7 +198,7 @@ numpad `.` -> `FDot`. On ISO/UK layouts, the `#~` key maps to CPC `]`.
 ## Current Limitations
 
 - Mounted `.dsk` images should currently be treated as read-only. Write activity is acknowledged so software keeps running, but changes are not persisted back to the image yet.
-- Pocket savestates / Memories are supported experimentally through an external-PSRAM staging path with a SNA v3-compatible staged payload. See `docs/SAVESTATE_DEVLOG.md` before changing the implementation.
+- Pocket savestates / Memories are supported experimentally through an external-PSRAM staging path with a SNA v3-compatible staged payload. See `docs/SAVESTATE_ARCHITECTURE.md` before changing the implementation.
 - Pocket sleep/wake resume uses the same experimental savestate path. It is hardware-proven for basic restore flows and now uses native APF setup loading for visible wake progress, but broader media and in-flight hardware state coverage still needs validation.
 - Savestate creation is currently rejected during active disk or tape activity, and tape runtime position is not preserved yet.
 - Pocket-created Memories currently appear under the `boot` label because the Pocket anchors them to the required `boot.rom` asset rather than runtime-loaded `.dsk`, `.cdt`, or `.sna` media. Converted Memories can use a better label through `scripts/pocketcpc_savestate.py`.
@@ -220,6 +222,9 @@ If you are here to build or work on the core rather than just use it, start with
 - [docs/DEVELOPER_GUIDE.md](https://github.com/stilvoid/PocketCPC/blob/main/docs/DEVELOPER_GUIDE.md)
 - [docs/COMPONENT_MAP.md](https://github.com/stilvoid/PocketCPC/blob/main/docs/COMPONENT_MAP.md)
 - [docs/ROM_ASSET_LAYOUT.md](https://github.com/stilvoid/PocketCPC/blob/main/docs/ROM_ASSET_LAYOUT.md)
+- [docs/SAVESTATE_ARCHITECTURE.md](https://github.com/stilvoid/PocketCPC/blob/main/docs/SAVESTATE_ARCHITECTURE.md)
+- [docs/MEDIA_TRANSPORT_ARCHITECTURE.md](https://github.com/stilvoid/PocketCPC/blob/main/docs/MEDIA_TRANSPORT_ARCHITECTURE.md)
+- [docs/INPUT_ARCHITECTURE.md](https://github.com/stilvoid/PocketCPC/blob/main/docs/INPUT_ARCHITECTURE.md)
 - [TODO.md](https://github.com/stilvoid/PocketCPC/blob/main/TODO.md)
 
 ## ROMs And Copyright

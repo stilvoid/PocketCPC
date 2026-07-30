@@ -16,6 +16,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from update_core_metadata import describe_version
+
 
 SNA_MAGIC = b"MV - SNA"
 SNA_HEADER_BYTES = 0x100
@@ -30,7 +32,6 @@ POCKETCPC_STA_WRAPPER_PAYLOAD_UNITS = (0x006, 0x00A)
 DEFAULT_CORE_FOLDER = "stilvoid.PocketCPC"
 DEFAULT_AUTHOR = "stilvoid"
 DEFAULT_CORE_NAME = "PocketCPC"
-DEFAULT_CORE_VERSION = "0.2.0"
 DEFAULT_PLATFORM_ID = "amstrad"
 DEFAULT_PLATFORM_NAME = "Amstrad CPC"
 
@@ -427,8 +428,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     to_sta.add_argument(
         "--core-version",
-        default=DEFAULT_CORE_VERSION,
-        help=f"core version metadata for generated wrappers (default: {DEFAULT_CORE_VERSION})",
+        help="core version metadata for generated wrappers (default: current git describe version)",
     )
     to_sta.add_argument(
         "--asset-name",
@@ -459,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
             extract_sna(args.input, args.output, args.force)
         elif args.command == "to-sta":
             asset_name = args.asset_name if args.asset_name is not None else args.input.name
+            core_version = args.core_version if args.core_version is not None else describe_version()
             build_sta(
                 args.input,
                 args.output,
@@ -471,7 +472,7 @@ def main(argv: list[str] | None = None) -> int:
                     core_folder=args.core_folder,
                     author=args.author,
                     core_name=args.core_name,
-                    core_version=args.core_version,
+                    core_version=core_version,
                     asset_name=asset_name,
                     platform_id=args.platform_id,
                     platform_name=args.platform_name,

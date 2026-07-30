@@ -2,6 +2,9 @@ upstreams/
 build/
 dist/
 scripts/__pycache__/
+src/fpga/db/
+src/fpga/incremental_db/
+src/fpga/output_files/
 
 # Build outputs published through GitHub Releases should not be committed.
 releases/

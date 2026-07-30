@@ -50,7 +50,7 @@ extra care during upstream refreshes:
 | --- | --- |
 | `cpc/UM6845R.v` | Adds SNA v3 CRTC timing-state export/restore ports for Pocket savestate fidelity. |
 | `cpc/GA40010/ga40010.sv` | Carries SNA v3 Gate Array interrupt-state ports through to the sync generator. |
-| `cpc/GA40010/syncgen_sync.v` | Exposes/restores the GA interrupt scanline counter and IRQ-active flag used by SNA v3 savestates. |
+| `cpc/GA40010/syncgen_sync.v` | Exposes/restores the GA VSYNC-delay counter, interrupt scanline counter, and IRQ-active flag used by SNA v3 savestates. |
 | `cpc/Amstrad_motherboard.v` | Wires PocketCPC SNA v3 CRTC/GA state between the wrapper and imported machine blocks. |
 
 ## Intentionally not imported as active machine files

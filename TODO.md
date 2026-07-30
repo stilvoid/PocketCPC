@@ -36,11 +36,10 @@ release candidate.
    - Disk writes are currently fake-acknowledged for compatibility.
    - No sector changes are written back to the mounted image yet.
 
-5. Restore snapshot saving
-   - The current snapshot-save HDL path is not exposed in the public menu
-     because it has not been proven reliable on Pocket hardware.
-   - Validate the APF data-slot write/open-file flow before documenting this
-     as an end-user feature.
+5. Revisit runtime snapshot saving
+   - Snapshot loading remains useful for mounted `.sna` files under `/Assets`.
+   - Reintroduce save/export only after there is a proven APF-backed write path
+     and a clear user workflow for getting those files back into the core.
 
 6. Add an adapter-layer test harness
    - Cover the local APF bridge, data-slot, and input translation modules.
@@ -70,7 +69,8 @@ release candidate.
      last runtime-loaded `.sna`, `.dsk`, or `.cdt` media instead of the fixed
      `boot.rom` asset. If APF exposes no supported runtime content-title path,
      keep this documented as a Pocket UI limitation.
-   - Maintain `docs/SAVESTATE_DEVLOG.md` as experiments confirm or eliminate
+   - Keep `docs/SAVESTATE_ARCHITECTURE.md`, `README.md`, and
+     `docs/DEVELOPER_GUIDE.md` aligned as experiments confirm or eliminate
      design directions.
 
 8. Expansion ROM support

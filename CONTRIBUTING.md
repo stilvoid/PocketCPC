@@ -15,7 +15,7 @@ Read these first:
 4. `docs/COMPONENT_MAP.md`
 5. `docs/CPC_IMPORT_MANIFEST.md` if you are touching imported CPC machine files
 6. `docs/ROM_ASSET_LAYOUT.md` if you are changing `boot.rom` handling or ROM assumptions
-7. `docs/SAVESTATE_DEVLOG.md` if you are touching Pocket savestates or Memories
+7. `docs/SAVESTATE_ARCHITECTURE.md` if you are touching Pocket savestates or Memories
 8. `TODO.md` for the current backlog
 9. `CHANGELOG.md` when preparing a release or release notes
 
