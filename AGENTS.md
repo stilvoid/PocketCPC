@@ -13,8 +13,9 @@ Read these first before changing code:
 4. `docs/COMPONENT_MAP.md`
 5. `docs/CPC_IMPORT_MANIFEST.md` if you are touching imported CPC machine files
 6. `docs/ROM_ASSET_LAYOUT.md` if you are changing `boot.rom` loading, packaging, or model ROM assumptions
-7. `TODO.md`
-8. `CHANGELOG.md` when preparing or documenting a release
+7. `docs/SAVESTATE_DEVLOG.md` if you are touching Pocket savestates or Memories
+8. `TODO.md`
+9. `CHANGELOG.md` when preparing or documenting a release
 
 ## Project Intent
 
@@ -86,11 +87,19 @@ Local PocketCPC code should own only:
 - For routine feature work, do not start `make build`, `make report`,
   `make dist`, or other Quartus-driven flows unless a human explicitly asks for
   that validation.
+- If a human reports that a build failed, inspect the existing logs and reports
+  first. Do not restart `make build`, rerun Quartus, or reinstall artifacts
+  just because an agent changed code or found a likely fix; hand the rerun back
+  to the human unless they explicitly ask the agent to execute the build.
 - After code changes, prefer handing off by asking the human collaborator to
   run `make dist` when they want build, timing, and packaging validation. The
   default matters here because Quartus builds produce a lot of log output, and
   having an agent run them can burn a large number of tokens for little value
   when a human can launch the same command directly.
+- Treat Quartus execution as human-owned by default. Agents may read status,
+  logs, timestamps, and reports for a build the human started, but they should
+  not assume permission to relaunch or continue that build without an explicit
+  user instruction to do so.
 - Before starting a long build, be clear what new information that artifact
   should provide.
 - When monitoring `make build`, prefer

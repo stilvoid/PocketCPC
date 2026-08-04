@@ -6,23 +6,21 @@
         "name": "ROM Bundle",
         "id": "0x200",
         "required": true,
-        "deferload": true,
         "parameters": 10,
         "size_exact": "0x00028000",
         "filename": "boot.rom",
         "extensions": ["rom"],
-        "address": "0x00000000"
+        "address": "0x60000000"
       },
       {
         "name": "Custom ROM",
         "id": "0x208",
         "required": false,
-        "deferload": true,
         "parameters": 10,
         "size_exact": "0x00004000",
         "filename": "custom.rom",
         "extensions": ["rom"],
-        "address": "0x00000000"
+        "address": "0x60028000"
       },
       {
         "name": "Drive A",

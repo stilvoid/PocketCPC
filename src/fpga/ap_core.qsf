@@ -71,10 +71,12 @@ set_global_assignment -name VERILOG_FILE core/mf_audio_pll_0002.v
 set_global_assignment -name VERILOG_FILE core/mf_audio_pll.v
 set_global_assignment -name SYSTEMVERILOG_FILE core/cpc_pocket_input.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/cpc_virtual_keyboard_overlay.sv
+set_global_assignment -name SYSTEMVERILOG_FILE core/psram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/sound_i2s.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/sync_fifo.sv
+set_global_assignment -name SYSTEMVERILOG_FILE core/cpc_savestate_controller.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/core_top.sv
-set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_dataslot_loader.sv
+set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_apf_write_loader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_fdc_dataslot.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_sna_dataslot.sv
 set_global_assignment -name SYSTEMVERILOG_FILE core/pocket_sna_save_dataslot.sv

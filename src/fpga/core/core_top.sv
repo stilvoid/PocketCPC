@@ -168,18 +168,6 @@ assign port_tran_sck_dir = 1'b0;
 assign port_tran_sd      = 1'bz;
 assign port_tran_sd_dir  = 1'b0;
 
-assign cram0_a      = 6'h00;
-assign cram0_dq     = 16'hzzzz;
-assign cram0_clk    = 1'b0;
-assign cram0_adv_n  = 1'b1;
-assign cram0_cre    = 1'b0;
-assign cram0_ce0_n  = 1'b1;
-assign cram0_ce1_n  = 1'b1;
-assign cram0_oe_n   = 1'b1;
-assign cram0_we_n   = 1'b1;
-assign cram0_ub_n   = 1'b1;
-assign cram0_lb_n   = 1'b1;
-
 assign cram1_a      = 6'h00;
 assign cram1_dq     = 16'hzzzz;
 assign cram1_clk    = 1'b0;
@@ -202,7 +190,7 @@ assign dram_ras_n = 1'b1;
 assign dram_cas_n = 1'b1;
 assign dram_we_n  = 1'b1;
 
-assign sram_a    = 17'h00000;
+assign sram_a    = 17'd0;
 assign sram_dq   = 16'hzzzz;
 assign sram_oe_n = 1'b1;
 assign sram_we_n = 1'b1;
@@ -222,6 +210,7 @@ wire cpc_pll_locked_74;
 reg  cpc_pll_ready_74 = 1'b0;
 reg [15:0] cpc_pll_lock_count = 16'd0;
 wire cpc_reset_n;
+wire cpc_rom_loader_reset_n;
 wire cpc_loader_reset_n;
 wire host_reset_n;
 reg  host_reset_stable_n = 1'b0;
@@ -277,10 +266,11 @@ always @(posedge clk_74a) begin
     end
 end
 
-// Keep the ROM/FDC loader side on the same debounced framework-reset contract as
-// the CPC machine itself. Without that, relaunching the core can preserve stale
-// loader/runtime state across runs and produce inconsistent warm-start boots.
+// APF loads required data slots during setup, before Reset Exit. ROM storage
+// therefore resets once clocks are stable, while runtime media adapters still
+// follow the debounced framework reset used by the CPC machine.
 synch_3 cpc_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_stable_n, cpc_reset_n, cpc_clk);
+synch_3 cpc_rom_loader_reset_sync(core_reset_n & cpc_pll_ready_74, cpc_rom_loader_reset_n, cpc_clk);
 synch_3 cpc_loader_reset_sync(core_reset_n & cpc_pll_ready_74 & host_reset_stable_n, cpc_loader_reset_n, cpc_clk);
 
 // MiSTer runs the CPC from 64 MHz and derives a clean 16 MHz gate-array enable.
@@ -334,13 +324,57 @@ wire [15:0] cpc_capture_ram_word_data;
 wire        cpc_snapshot_save_busy;
 wire        cpc_snapshot_save_ok;
 wire        cpc_snapshot_save_err;
+wire        cpc_savestate_freeze_cpu;
+wire        cpc_savestate_busy_reset;
+wire        cpc_savestate_snapshot_word_wr;
+wire [15:0] cpc_savestate_snapshot_word_addr;
+wire [15:0] cpc_savestate_snapshot_word_data;
+wire        cpc_savestate_capture_ram_rd;
+wire [15:0] cpc_savestate_capture_ram_word_addr;
+wire        cpc_savestate_start_ack;
+wire        cpc_savestate_start_busy;
+wire        cpc_savestate_start_ok;
+wire        cpc_savestate_start_err;
+wire        cpc_savestate_load_ack;
+wire        cpc_savestate_load_busy;
+wire        cpc_savestate_load_ok;
+wire        cpc_savestate_load_err;
+wire [31:0] cpc_savestate_bridge_rd_data;
+wire        cpc_savestate_bridge_selected;
+wire        cpc_savestate_sna_load;
+wire [211:0] cpc_savestate_sna_cpu_dir;
+wire [4:0]  cpc_savestate_sna_crtc_addr;
+wire [143:0] cpc_savestate_sna_crtc_regs;
+wire        cpc_savestate_sna_crtc_v3_valid;
+wire [63:0] cpc_savestate_sna_crtc_v3;
+wire [4:0]  cpc_savestate_sna_ga_inksel;
+wire [135:0] cpc_savestate_sna_ga_palette;
+wire [7:0]  cpc_savestate_sna_ga_config;
+wire [7:0]  cpc_savestate_sna_ga_vsync_delay;
+wire [7:0]  cpc_savestate_sna_ga_int_scanline;
+wire        cpc_savestate_sna_ga_irq_active;
+wire [7:0]  cpc_savestate_sna_ram_config;
+wire [7:0]  cpc_savestate_sna_rom_select;
+wire [7:0]  cpc_savestate_sna_ppi_a;
+wire [7:0]  cpc_savestate_sna_ppi_b;
+wire [7:0]  cpc_savestate_sna_ppi_c;
+wire [7:0]  cpc_savestate_sna_ppi_control;
+wire [3:0]  cpc_savestate_sna_psg_addr;
+wire [127:0] cpc_savestate_sna_psg_regs;
+wire [1:0]  cpc_savestate_sna_model;
 wire        cpc_sna_load;
+wire        cpc_sna_freeze_cpu;
 wire [211:0] cpc_sna_cpu_dir;
 wire [4:0]  cpc_sna_crtc_addr;
 wire [143:0] cpc_sna_crtc_regs;
+wire        cpc_sna_crtc_v3_valid;
+wire [63:0] cpc_sna_crtc_v3;
 wire [4:0]  cpc_sna_ga_inksel;
 wire [135:0] cpc_sna_ga_palette;
 wire [7:0]  cpc_sna_ga_config;
+wire [7:0]  cpc_sna_ga_vsync_delay;
+wire [7:0]  cpc_sna_ga_int_scanline;
+wire        cpc_sna_ga_irq_active;
 wire [7:0]  cpc_sna_ram_config;
 wire [7:0]  cpc_sna_rom_select;
 wire [7:0]  cpc_sna_ppi_a;
@@ -354,9 +388,13 @@ wire [1:0]  cpc_state_model;
 wire [211:0] cpc_state_cpu_dir;
 wire [4:0]  cpc_state_crtc_addr;
 wire [143:0] cpc_state_crtc_regs;
+wire [63:0] cpc_state_crtc_v3;
 wire [4:0]  cpc_state_ga_inksel;
 wire [135:0] cpc_state_ga_palette;
 wire [7:0]  cpc_state_ga_config;
+wire [7:0]  cpc_state_ga_vsync_delay;
+wire [7:0]  cpc_state_ga_int_scanline;
+wire        cpc_state_ga_irq_active;
 wire [7:0]  cpc_state_ram_config;
 wire [7:0]  cpc_state_rom_select;
 wire [7:0]  cpc_state_ppi_a;
@@ -365,31 +403,79 @@ wire [7:0]  cpc_state_ppi_c;
 wire [7:0]  cpc_state_ppi_control;
 wire [3:0]  cpc_state_psg_addr;
 wire [127:0] cpc_state_psg_regs;
-wire        cpc_capture_ram_rd = cpc_snapshot_save_ram_rd;
-wire [15:0] cpc_capture_ram_word_addr = cpc_snapshot_save_ram_word_addr;
-wire        cpc_restore_busy_reset = cpc_snapshot_busy_reset;
+wire        cpc_fdc_idle;
+wire        cpc_capture_ram_rd = cpc_savestate_capture_ram_rd | cpc_snapshot_save_ram_rd;
+wire [15:0] cpc_capture_ram_word_addr =
+    cpc_savestate_capture_ram_rd ? cpc_savestate_capture_ram_word_addr :
+    cpc_snapshot_save_ram_word_addr;
+wire        cpc_restore_busy_reset = cpc_snapshot_busy_reset | cpc_savestate_busy_reset;
 wire        cpc_restore_snapshot_mem_wr = cpc_snapshot_mem_wr;
 wire [16:0] cpc_restore_snapshot_mem_addr = cpc_snapshot_mem_addr;
 wire [7:0]  cpc_restore_snapshot_mem_data = cpc_snapshot_mem_data;
-wire        cpc_restore_snapshot_word_wr = cpc_snapshot_word_wr;
-wire [15:0] cpc_restore_snapshot_word_addr = cpc_snapshot_word_addr;
-wire [15:0] cpc_restore_snapshot_word_data = cpc_snapshot_word_data;
-wire        cpc_restore_sna_load = cpc_sna_load;
-wire [211:0] cpc_restore_sna_cpu_dir = cpc_sna_cpu_dir;
-wire [4:0]  cpc_restore_sna_crtc_addr = cpc_sna_crtc_addr;
-wire [143:0] cpc_restore_sna_crtc_regs = cpc_sna_crtc_regs;
-wire [4:0]  cpc_restore_sna_ga_inksel = cpc_sna_ga_inksel;
-wire [135:0] cpc_restore_sna_ga_palette = cpc_sna_ga_palette;
-wire [7:0]  cpc_restore_sna_ga_config = cpc_sna_ga_config;
-wire [7:0]  cpc_restore_sna_ram_config = cpc_sna_ram_config;
-wire [7:0]  cpc_restore_sna_rom_select = cpc_sna_rom_select;
-wire [7:0]  cpc_restore_sna_ppi_a = cpc_sna_ppi_a;
-wire [7:0]  cpc_restore_sna_ppi_b = cpc_sna_ppi_b;
-wire [7:0]  cpc_restore_sna_ppi_c = cpc_sna_ppi_c;
-wire [7:0]  cpc_restore_sna_ppi_control = cpc_sna_ppi_control;
-wire [3:0]  cpc_restore_sna_psg_addr = cpc_sna_psg_addr;
-wire [127:0] cpc_restore_sna_psg_regs = cpc_sna_psg_regs;
-wire [1:0]  cpc_restore_sna_model = cpc_sna_model;
+wire        cpc_restore_snapshot_word_wr = cpc_savestate_snapshot_word_wr | cpc_snapshot_word_wr;
+wire [15:0] cpc_restore_snapshot_word_addr =
+    cpc_savestate_snapshot_word_wr ? cpc_savestate_snapshot_word_addr : cpc_snapshot_word_addr;
+wire [15:0] cpc_restore_snapshot_word_data =
+    cpc_savestate_snapshot_word_wr ? cpc_savestate_snapshot_word_data : cpc_snapshot_word_data;
+wire        cpc_restore_sna_load = cpc_savestate_sna_load | cpc_sna_load;
+wire [211:0] cpc_restore_sna_cpu_dir =
+    cpc_savestate_sna_load ? cpc_savestate_sna_cpu_dir : cpc_sna_cpu_dir;
+wire [4:0]  cpc_restore_sna_crtc_addr =
+    cpc_savestate_sna_load ? cpc_savestate_sna_crtc_addr : cpc_sna_crtc_addr;
+wire [143:0] cpc_restore_sna_crtc_regs =
+    cpc_savestate_sna_load ? cpc_savestate_sna_crtc_regs : cpc_sna_crtc_regs;
+wire        cpc_restore_sna_crtc_v3_valid =
+    cpc_savestate_sna_load ? cpc_savestate_sna_crtc_v3_valid : cpc_sna_crtc_v3_valid;
+wire [63:0] cpc_restore_sna_crtc_v3 =
+    cpc_savestate_sna_load ? cpc_savestate_sna_crtc_v3 : cpc_sna_crtc_v3;
+wire [4:0]  cpc_restore_sna_ga_inksel =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ga_inksel : cpc_sna_ga_inksel;
+wire [135:0] cpc_restore_sna_ga_palette =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ga_palette : cpc_sna_ga_palette;
+wire [7:0]  cpc_restore_sna_ga_config =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ga_config : cpc_sna_ga_config;
+wire [7:0]  cpc_restore_sna_ga_vsync_delay =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ga_vsync_delay : cpc_sna_ga_vsync_delay;
+wire [7:0]  cpc_restore_sna_ga_int_scanline =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ga_int_scanline : cpc_sna_ga_int_scanline;
+wire        cpc_restore_sna_ga_irq_active =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ga_irq_active : cpc_sna_ga_irq_active;
+wire [7:0]  cpc_restore_sna_ram_config =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ram_config : cpc_sna_ram_config;
+wire [7:0]  cpc_restore_sna_rom_select =
+    cpc_savestate_sna_load ? cpc_savestate_sna_rom_select : cpc_sna_rom_select;
+wire [7:0]  cpc_restore_sna_ppi_a =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ppi_a : cpc_sna_ppi_a;
+wire [7:0]  cpc_restore_sna_ppi_b =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ppi_b : cpc_sna_ppi_b;
+wire [7:0]  cpc_restore_sna_ppi_c =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ppi_c : cpc_sna_ppi_c;
+wire [7:0]  cpc_restore_sna_ppi_control =
+    cpc_savestate_sna_load ? cpc_savestate_sna_ppi_control : cpc_sna_ppi_control;
+wire [3:0]  cpc_restore_sna_psg_addr =
+    cpc_savestate_sna_load ? cpc_savestate_sna_psg_addr : cpc_sna_psg_addr;
+wire [127:0] cpc_restore_sna_psg_regs =
+    cpc_savestate_sna_load ? cpc_savestate_sna_psg_regs : cpc_sna_psg_regs;
+wire [1:0]  cpc_restore_sna_model =
+    cpc_savestate_sna_load ? cpc_savestate_sna_model : cpc_sna_model;
+assign savestate_debug_top_state = {
+    cpc_cpu_addr_debug,
+    4'd0,
+    cpc_state_model,
+    cpc_menu_model,
+    cpc_menu_restart_active,
+    cpc_restore_busy_reset,
+    cpc_restore_sna_load,
+    cpc_menu_pause_active,
+    cpc_ce_16,
+    cpc_reset_n,
+    host_reset_n_cpc,
+    cpc_custom_rom_ready
+};
+assign savestate_debug_cpu_pcsp = {
+    cpc_state_cpu_dir[79:64],
+    cpc_state_cpu_dir[63:48]
+};
 wire [3:0]  cpc_loader_state;
 wire [31:0] cpc_loader_offset;
 wire        cpc_rom_loaded;
@@ -455,6 +541,24 @@ synch_3 #(.WIDTH(32)) cont3_joy_sync_cpc(cont3_joy, cont3_joy_cpc, cpc_clk);
 synch_3 #(.WIDTH(16)) cont3_trig_sync_cpc(cont3_trig, cont3_trig_cpc, cpc_clk);
 synch_3 restart_request_sync_cpc(restart_request_toggle, restart_request_toggle_cpc, cpc_clk);
 synch_3 snapshot_save_request_sync_cpc(snapshot_save_request_toggle, snapshot_save_request_toggle_cpc, cpc_clk);
+synch_3 #(.WIDTH(32)) savestate_debug_status_sync_74(savestate_debug_status, savestate_debug_status_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_progress_sync_74(savestate_debug_progress, savestate_debug_progress_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_addresses_sync_74(savestate_debug_addresses, savestate_debug_addresses_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_bridge_flags_sync_74(savestate_debug_bridge_flags, savestate_debug_bridge_flags_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_last_load_word_raw_sync_74(savestate_debug_last_load_word_raw, savestate_debug_last_load_word_raw_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_last_load_word_norm_sync_74(savestate_debug_last_load_word_norm, savestate_debug_last_load_word_norm_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_load_header_word0_sync_74(savestate_debug_load_header_word0, savestate_debug_load_header_word0_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_load_header_word1_sync_74(savestate_debug_load_header_word1, savestate_debug_load_header_word1_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_save_readback_word0_sync_74(savestate_debug_save_readback_word0, savestate_debug_save_readback_word0_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_save_readback_word1_sync_74(savestate_debug_save_readback_word1, savestate_debug_save_readback_word1_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_save_readback_word2_sync_74(savestate_debug_save_readback_word2, savestate_debug_save_readback_word2_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_save_readback_word3_sync_74(savestate_debug_save_readback_word3, savestate_debug_save_readback_word3_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_bridge_prime_word0_sync_74(savestate_debug_bridge_prime_word0, savestate_debug_bridge_prime_word0_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_bridge_prime_word1_sync_74(savestate_debug_bridge_prime_word1, savestate_debug_bridge_prime_word1_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_bridge_host_write_count_sync_74(savestate_debug_bridge_host_write_count, savestate_debug_bridge_host_write_count_74, clk_74a);
+synch_3 #(.WIDTH(2)) savestate_state_model_sync_74(cpc_state_model, cpc_state_model_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_top_state_sync_74(savestate_debug_top_state, savestate_debug_top_state_74, clk_74a);
+synch_3 #(.WIDTH(32)) savestate_debug_cpu_pcsp_sync_74(savestate_debug_cpu_pcsp, savestate_debug_cpu_pcsp_74, clk_74a);
 
 cpc_pocket_input cpc_input (
     .clk       ( cpc_clk ),
@@ -478,7 +582,7 @@ cpc_pocket_input cpc_input (
 cpc_machine_pocket cpc_machine (
     .clk             ( cpc_clk ),
     .reset           ( !cpc_reset_n | cpc_menu_restart_active | !cpc_custom_rom_ready ),
-    .rom_reset       ( !cpc_loader_reset_n ),
+    .rom_reset       ( !cpc_rom_loader_reset_n ),
     .pause           ( cpc_menu_pause_active ),
     .ce_16           ( cpc_ce_16 ),
     .ce_pix          ( cpc_ce_16 ),
@@ -486,7 +590,7 @@ cpc_machine_pocket cpc_machine (
     .joy2            ( cpc_joy2 ),
     .ps2_key         ( cpc_ps2_key ),
     .vkb_caps_hold   ( cpc_vkb_caps_pulse ),
-    .freeze_cpu      ( cpc_snapshot_save_freeze_cpu ),
+    .freeze_cpu      ( cpc_snapshot_save_freeze_cpu | cpc_savestate_freeze_cpu | cpc_sna_freeze_cpu ),
     .loader_wr       ( cpc_memory_loader_wr ),
     .loader_addr     ( cpc_memory_loader_addr ),
     .loader_data     ( cpc_memory_loader_data ),
@@ -509,9 +613,15 @@ cpc_machine_pocket cpc_machine (
     .sna_cpu_dir     ( cpc_restore_sna_cpu_dir ),
     .sna_crtc_addr   ( cpc_restore_sna_crtc_addr ),
     .sna_crtc_regs   ( cpc_restore_sna_crtc_regs ),
+    .sna_crtc_v3_valid ( cpc_restore_sna_crtc_v3_valid ),
+    .sna_crtc_v3     ( cpc_restore_sna_crtc_v3 ),
     .sna_ga_inksel   ( cpc_restore_sna_ga_inksel ),
     .sna_ga_palette  ( cpc_restore_sna_ga_palette ),
     .sna_ga_config   ( cpc_restore_sna_ga_config ),
+    .sna_ga_v3_valid ( cpc_restore_sna_crtc_v3_valid ),
+    .sna_ga_vsync_delay ( cpc_restore_sna_ga_vsync_delay ),
+    .sna_ga_int_scanline ( cpc_restore_sna_ga_int_scanline ),
+    .sna_ga_irq_active ( cpc_restore_sna_ga_irq_active ),
     .sna_ram_config  ( cpc_restore_sna_ram_config ),
     .sna_rom_select  ( cpc_restore_sna_rom_select ),
     .sna_ppi_a       ( cpc_restore_sna_ppi_a ),
@@ -556,6 +666,7 @@ cpc_machine_pocket cpc_machine (
     .video_mode      ( cpc_video_mode ),
     .audio_left      ( cpc_audio_l ),
     .audio_right     ( cpc_audio_r ),
+    .fdc_idle        ( cpc_fdc_idle ),
     .cpu_addr_debug  ( cpc_cpu_addr_debug ),
     .mem_rd_debug    ( cpc_mem_rd_debug ),
     .mem_wr_debug    ( cpc_mem_wr_debug ),
@@ -563,9 +674,13 @@ cpc_machine_pocket cpc_machine (
     .state_cpu_dir   ( cpc_state_cpu_dir ),
     .state_crtc_addr ( cpc_state_crtc_addr ),
     .state_crtc_regs ( cpc_state_crtc_regs ),
+    .state_crtc_v3   ( cpc_state_crtc_v3 ),
     .state_ga_inksel ( cpc_state_ga_inksel ),
     .state_ga_palette ( cpc_state_ga_palette ),
     .state_ga_config ( cpc_state_ga_config ),
+    .state_ga_vsync_delay ( cpc_state_ga_vsync_delay ),
+    .state_ga_int_scanline ( cpc_state_ga_int_scanline ),
+    .state_ga_irq_active ( cpc_state_ga_irq_active ),
     .state_ram_config ( cpc_state_ram_config ),
     .state_rom_select ( cpc_state_rom_select ),
     .state_ppi_a     ( cpc_state_ppi_a ),
@@ -637,6 +752,7 @@ reg       cpc_apf_pixel_clk_90 = 1'b0;
 reg       cpc_native_de = 1'b0;
 reg       cpc_native_hs = 1'b0;
 reg       cpc_native_vs = 1'b0;
+wire      cpc_savestate_frame_pulse = cpc_native_vs;
 reg [23:0] cpc_native_rgb = 24'h000000;
 reg       apf_video_de = 1'b0;
 reg       apf_video_hs = 1'b0;
@@ -1146,30 +1262,84 @@ wire [31:0] loader_addr;
 wire [31:0] loader_data;
 wire [31:0] loader_command;
 wire [31:0] bridge_status;
+wire [31:0] savestate_debug_status;
+wire [31:0] savestate_debug_progress;
+wire [31:0] savestate_debug_addresses;
+wire [31:0] savestate_debug_bridge_flags;
+wire [31:0] savestate_debug_last_load_word_raw;
+wire [31:0] savestate_debug_last_load_word_norm;
+wire [31:0] savestate_debug_load_header_word0;
+wire [31:0] savestate_debug_load_header_word1;
+wire [31:0] savestate_debug_save_readback_word0;
+wire [31:0] savestate_debug_save_readback_word1;
+wire [31:0] savestate_debug_save_readback_word2;
+wire [31:0] savestate_debug_save_readback_word3;
+wire [31:0] savestate_debug_bridge_prime_word0;
+wire [31:0] savestate_debug_bridge_prime_word1;
+wire [31:0] savestate_debug_bridge_host_write_count;
+wire [31:0] savestate_debug_bridge_last_host_write;
+wire        cpc_savestate_load_progress_active;
+wire [15:0] cpc_savestate_load_progress_words;
+wire        cpc_savestate_load_progress_128k;
+wire        cpc_savestate_load_progress_complete;
+wire [31:0] savestate_debug_status_74;
+wire [31:0] savestate_debug_progress_74;
+wire [31:0] savestate_debug_addresses_74;
+wire [31:0] savestate_debug_bridge_flags_74;
+wire [31:0] savestate_debug_last_load_word_raw_74;
+wire [31:0] savestate_debug_last_load_word_norm_74;
+wire [31:0] savestate_debug_load_header_word0_74;
+wire [31:0] savestate_debug_load_header_word1_74;
+wire [31:0] savestate_debug_save_readback_word0_74;
+wire [31:0] savestate_debug_save_readback_word1_74;
+wire [31:0] savestate_debug_save_readback_word2_74;
+wire [31:0] savestate_debug_save_readback_word3_74;
+wire [31:0] savestate_debug_bridge_prime_word0_74;
+wire [31:0] savestate_debug_bridge_prime_word1_74;
+wire [31:0] savestate_debug_bridge_host_write_count_74;
 wire [31:0] regs_bridge_rd_data;
 wire [31:0] cmd_bridge_rd_data;
 wire [31:0] snapshot_save_bridge_rd_data;
 wire [31:0] interact_config_cpc;
 wire        restart_request_toggle;
 wire        snapshot_save_request_toggle;
-wire        savestate_start_unused;
-wire        savestate_load_unused;
+wire [31:0] savestate_debug_top_state;
+wire [31:0] savestate_debug_cpu_pcsp;
+wire [31:0] savestate_debug_top_state_74;
+wire [31:0] savestate_debug_cpu_pcsp_74;
+reg         savestate_debug_prev_load_err_74 = 1'b0;
+reg         savestate_debug_prev_load_ok_74 = 1'b0;
+reg  [4:0]  savestate_debug_event_index_74 = 5'd0;
+reg  [31:0] savestate_debug_event_marker_74 = 32'h5353_4C45;
+reg         savestate_target_debug_event_74 = 1'b0;
+reg  [31:0] savestate_target_debug_data_74 = 32'd0;
+wire        savestate_supported = 1'b1;
+wire [31:0] savestate_addr = 32'h4000_0000;
+wire [1:0]  cpc_state_model_74;
+wire [31:0] savestate_size =
+    (cpc_state_model_74 == 2'd0) ? 32'd131328 : 32'd65792;
+wire [31:0] savestate_maxloadsize = 32'd131328;
+wire        savestate_start;
+wire        savestate_load;
+wire [7:0]  savestate_load_progress_unit =
+    cpc_savestate_load_progress_128k ?
+    cpc_savestate_load_progress_words[15:8] :
+    cpc_savestate_load_progress_words[14:7];
+wire [12:0] savestate_load_progress_times25 =
+    ({5'd0, savestate_load_progress_unit} << 4) +
+    ({5'd0, savestate_load_progress_unit} << 3) +
+    {5'd0, savestate_load_progress_unit};
+wire [7:0]  savestate_load_progress_percent_raw =
+    savestate_load_progress_times25[12:5];
+wire [15:0] savestate_load_progress_percent =
+    cpc_savestate_load_progress_complete ? 16'd100 :
+    (savestate_load_progress_percent_raw > 8'd100) ? 16'd100 :
+    {8'd0, savestate_load_progress_percent_raw};
 reg  [9:0]  datatable_addr = 10'd0;
 wire [31:0] datatable_q;
-wire [9:0]  rom_loader_datatable_addr_unused;
-wire [9:0]  custom_datatable_addr_unused;
-wire        rom_target_dataslot_read;
-wire [15:0] rom_target_dataslot_id;
-wire [31:0] rom_target_dataslot_slotoffset;
-wire [31:0] rom_target_dataslot_bridgeaddr;
-wire [31:0] rom_target_dataslot_length;
-wire        rom_target_active;
-wire        custom_rom_target_dataslot_read;
-wire [15:0] custom_rom_target_dataslot_id;
-wire [31:0] custom_rom_target_dataslot_slotoffset;
-wire [31:0] custom_rom_target_dataslot_bridgeaddr;
-wire [31:0] custom_rom_target_dataslot_length;
-wire        custom_rom_target_active;
+wire        dataslot_requestwrite;
+wire [15:0] dataslot_requestwrite_id;
+wire [31:0] dataslot_requestwrite_size;
 wire        fdc_target_dataslot_read;
 wire [15:0] fdc_target_dataslot_id;
 wire [31:0] fdc_target_dataslot_slotoffset;
@@ -1195,10 +1365,6 @@ wire [2:0]  target_dataslot_err_s;
 wire        target_dataslot_ack_cpc;
 wire        target_dataslot_done_cpc;
 wire [2:0]  target_dataslot_err_cpc;
-wire        loader_cmd_request_flag;
-wire        loader_cmd_write_strobe;
-wire        custom_rom_loader_cmd_request_flag;
-wire        custom_rom_loader_cmd_write_strobe;
 wire        sna_cmd_request_flag;
 wire        sna_cmd_write_strobe;
 wire        fdc_cmd_request_flag;
@@ -1240,11 +1406,32 @@ wire [31:0] rtc_date_bcd;
 wire [31:0] rtc_time_bcd;
 wire        rtc_valid;
 wire        dataslot_runtime_enable = cpc_loader_done & cpc_rom_loaded;
-wire        custom_rom_client_selected = custom_rom_target_active;
+wire        cpc_savestate_runtime_ready = dataslot_runtime_enable & cpc_custom_rom_ready;
 wire        snapshot_save_client_selected = dataslot_runtime_enable & snapshot_save_target_active;
 wire        sna_client_selected = dataslot_runtime_enable & !snapshot_save_target_active & sna_target_active;
 wire        tape_client_selected = dataslot_runtime_enable & !snapshot_save_target_active & !sna_target_active & tape_target_active;
 wire        fdc_client_selected = dataslot_runtime_enable & !snapshot_save_target_active & !sna_target_active & !tape_target_active & fdc_target_active;
+wire        cpc_savestate_save_safe =
+    cpc_savestate_runtime_ready &
+    cpc_fdc_idle &
+    !cpc_tape_running &
+    !cpc_tape_motor &
+    !cpc_menu_pause_active &
+    !snapshot_save_target_active &
+    !sna_target_active &
+    !tape_target_active &
+    !fdc_target_active &
+    !cpc_snapshot_busy_reset &
+    !cpc_sna_load;
+wire        cpc_savestate_save_defer_ok =
+    cpc_savestate_runtime_ready &
+    (cpc_snapshot_busy_reset | cpc_sna_load | sna_target_active);
+wire        cpc_savestate_load_safe =
+    cpc_savestate_runtime_ready &
+    !snapshot_save_target_active &
+    !sna_target_active &
+    !tape_target_active &
+    !fdc_target_active;
 assign cpc_disk_activity_raw = (cpc_sd_rd != 2'b00) || (cpc_sd_wr != 2'b00) || cpc_sd_ack || fdc_target_active;
 assign cpc_tape_activity_raw = cpc_tape_running || tape_target_active;
 assign cpc_media_activity_raw = cpc_disk_activity_raw || cpc_tape_activity_raw;
@@ -1258,6 +1445,7 @@ reg  [31:0] tape_dataslot_size_74 = 32'd0;
 reg         sna_dataslot_toggle_74 = 1'b0;
 reg  [15:0] sna_dataslot_id_74 = 16'd0;
 reg  [31:0] sna_dataslot_size_74 = 32'd0;
+reg         dataslot_update_74_d = 1'b0;
 wire        fdc_dataslot_toggle_cpc;
 wire [15:0] fdc_dataslot_id_cpc;
 wire [31:0] fdc_dataslot_size_cpc;
@@ -1273,50 +1461,60 @@ wire [15:0] sna_dataslot_id_cpc;
 wire [31:0] sna_dataslot_size_cpc;
 reg         sna_dataslot_toggle_cpc_d = 1'b0;
 wire        sna_dataslot_update_cpc = sna_dataslot_toggle_cpc ^ sna_dataslot_toggle_cpc_d;
-wire        cpc_custom_loader_wr;
-wire [17:0] cpc_custom_loader_addr;
-wire [7:0]  cpc_custom_loader_data;
-wire        cpc_custom_loader_done;
-wire        cpc_custom_loader_error;
-wire        cpc_custom_rom_loader_start = cpc_loader_done && !cpc_custom_loader_done && !cpc_custom_loader_error;
-assign cpc_custom_rom_enable = cpc_custom_loader_done && !cpc_custom_loader_error;
-wire        cpc_custom_rom_ready = !cpc_loader_done || cpc_custom_loader_done || cpc_custom_loader_error;
+reg         apf_rom_write_active_74 = 1'b0;
+reg         apf_boot_rom_seen_74 = 1'b0;
+reg         apf_custom_rom_seen_74 = 1'b0;
+wire        apf_initial_dataslots_done_cpc;
+wire        apf_rom_write_active_cpc;
+wire        apf_boot_rom_seen_cpc;
+wire        apf_custom_rom_seen_cpc;
+wire        cpc_rom_payload_done =
+    apf_custom_rom_seen_cpc ?
+    (cpc_loader_offset >= 32'h0002_c000) :
+    (cpc_loader_offset >= 32'h0002_8000);
 
-assign cpc_memory_loader_wr   = custom_rom_target_active ? cpc_custom_loader_wr : cpc_loader_wr;
-assign cpc_memory_loader_addr = custom_rom_target_active ? cpc_custom_loader_addr : cpc_loader_addr;
-assign cpc_memory_loader_data = custom_rom_target_active ? cpc_custom_loader_data : cpc_loader_data;
+assign cpc_loader_done = apf_initial_dataslots_done_cpc &
+                         apf_boot_rom_seen_cpc &
+                         cpc_rom_payload_done;
+assign cpc_loader_error = apf_initial_dataslots_done_cpc & !apf_boot_rom_seen_cpc;
+assign cpc_custom_rom_enable = apf_initial_dataslots_done_cpc & apf_custom_rom_seen_cpc;
+wire   cpc_custom_rom_ready = cpc_loader_done;
+assign cpc_memory_loader_wr   = cpc_loader_wr;
+assign cpc_memory_loader_addr = cpc_loader_addr;
+assign cpc_memory_loader_data = cpc_loader_data;
+assign cpc_loader_state =
+    cpc_loader_error ? 4'd13 :
+    cpc_loader_done ? 4'd12 :
+    apf_rom_write_active_cpc ? 4'd4 :
+    apf_boot_rom_seen_cpc ? 4'd8 :
+    4'd1;
 
-assign target_dataslot_read       = custom_rom_client_selected ? custom_rom_target_dataslot_read :
-                                    snapshot_save_client_selected ? 1'b0 :
+assign target_dataslot_read       = snapshot_save_client_selected ? 1'b0 :
                                     sna_client_selected ? sna_target_dataslot_read :
                                     tape_client_selected ? tape_target_dataslot_read :
                                     fdc_client_selected ? fdc_target_dataslot_read :
-                                    rom_target_dataslot_read;
+                                    1'b0;
 assign target_dataslot_write      = snapshot_save_client_selected ? snapshot_save_target_dataslot_write : 1'b0;
-assign target_dataslot_id         = custom_rom_client_selected ? custom_rom_target_dataslot_id :
-                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_id :
+assign target_dataslot_id         = snapshot_save_client_selected ? snapshot_save_target_dataslot_id :
                                     sna_client_selected ? sna_target_dataslot_id :
                                     tape_client_selected ? tape_target_dataslot_id :
                                     fdc_client_selected ? fdc_target_dataslot_id :
-                                    rom_target_dataslot_id;
-assign target_dataslot_slotoffset = custom_rom_client_selected ? custom_rom_target_dataslot_slotoffset :
-                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_slotoffset :
+                                    16'd0;
+assign target_dataslot_slotoffset = snapshot_save_client_selected ? snapshot_save_target_dataslot_slotoffset :
                                     sna_client_selected ? sna_target_dataslot_slotoffset :
                                     tape_client_selected ? tape_target_dataslot_slotoffset :
                                     fdc_client_selected ? fdc_target_dataslot_slotoffset :
-                                    rom_target_dataslot_slotoffset;
-assign target_dataslot_bridgeaddr = custom_rom_client_selected ? custom_rom_target_dataslot_bridgeaddr :
-                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_bridgeaddr :
+                                    32'd0;
+assign target_dataslot_bridgeaddr = snapshot_save_client_selected ? snapshot_save_target_dataslot_bridgeaddr :
                                     sna_client_selected ? sna_target_dataslot_bridgeaddr :
                                     tape_client_selected ? tape_target_dataslot_bridgeaddr :
                                     fdc_client_selected ? fdc_target_dataslot_bridgeaddr :
-                                    rom_target_dataslot_bridgeaddr;
-assign target_dataslot_length     = custom_rom_client_selected ? custom_rom_target_dataslot_length :
-                                    snapshot_save_client_selected ? snapshot_save_target_dataslot_length :
+                                    32'd0;
+assign target_dataslot_length     = snapshot_save_client_selected ? snapshot_save_target_dataslot_length :
                                     sna_client_selected ? sna_target_dataslot_length :
                                     tape_client_selected ? tape_target_dataslot_length :
                                     fdc_client_selected ? fdc_target_dataslot_length :
-                                    rom_target_dataslot_length;
+                                    32'd0;
 
 always @(posedge clk_74a) begin
     if (!core_reset_n) begin
@@ -1329,22 +1527,43 @@ always @(posedge clk_74a) begin
         sna_dataslot_toggle_74 <= 1'b0;
         sna_dataslot_id_74     <= 16'd0;
         sna_dataslot_size_74   <= 32'd0;
+        apf_rom_write_active_74 <= 1'b0;
+        apf_boot_rom_seen_74    <= 1'b0;
+        apf_custom_rom_seen_74  <= 1'b0;
+        dataslot_update_74_d   <= 1'b0;
         datatable_addr <= 10'd0;
-    end else if (dataslot_update) begin
-        if ((dataslot_update_id == 16'h0001) || (dataslot_update_id == 16'h0002)) begin
-            fdc_dataslot_toggle_74 <= ~fdc_dataslot_toggle_74;
-            fdc_dataslot_id_74     <= dataslot_update_id;
-            fdc_dataslot_size_74   <= dataslot_update_size;
+    end else begin
+        dataslot_update_74_d <= dataslot_update;
+        if (dataslot_requestwrite) begin
+            apf_rom_write_active_74 <=
+                (dataslot_requestwrite_id == 16'h0200) ||
+                (dataslot_requestwrite_id == 16'h0208);
+            if (dataslot_requestwrite_id == 16'h0200) begin
+                apf_boot_rom_seen_74 <= 1'b1;
+            end
+            if (dataslot_requestwrite_id == 16'h0208) begin
+                apf_custom_rom_seen_74 <= 1'b1;
+            end
         end
-        if (dataslot_update_id == 16'h0003) begin
-            tape_dataslot_toggle_74 <= ~tape_dataslot_toggle_74;
-            tape_dataslot_id_74     <= dataslot_update_id;
-            tape_dataslot_size_74   <= dataslot_update_size;
+        if (dataslot_allcomplete) begin
+            apf_rom_write_active_74 <= 1'b0;
         end
-        if (dataslot_update_id == 16'h0004) begin
-            sna_dataslot_toggle_74 <= ~sna_dataslot_toggle_74;
-            sna_dataslot_id_74     <= dataslot_update_id;
-            sna_dataslot_size_74   <= dataslot_update_size;
+        if (dataslot_update && !dataslot_update_74_d) begin
+            if ((dataslot_update_id == 16'h0001) || (dataslot_update_id == 16'h0002)) begin
+                fdc_dataslot_toggle_74 <= ~fdc_dataslot_toggle_74;
+                fdc_dataslot_id_74     <= dataslot_update_id;
+                fdc_dataslot_size_74   <= dataslot_update_size;
+            end
+            if (dataslot_update_id == 16'h0003) begin
+                tape_dataslot_toggle_74 <= ~tape_dataslot_toggle_74;
+                tape_dataslot_id_74     <= dataslot_update_id;
+                tape_dataslot_size_74   <= dataslot_update_size;
+            end
+            if (dataslot_update_id == 16'h0004) begin
+                sna_dataslot_toggle_74 <= ~sna_dataslot_toggle_74;
+                sna_dataslot_id_74     <= dataslot_update_id;
+                sna_dataslot_size_74   <= dataslot_update_size;
+            end
         end
     end
 end
@@ -1358,6 +1577,10 @@ synch_3 #(.WIDTH(32)) tape_dataslot_size_sync(tape_dataslot_size_74, tape_datasl
 synch_3 sna_dataslot_toggle_sync(sna_dataslot_toggle_74, sna_dataslot_toggle_cpc, cpc_clk);
 synch_3 #(.WIDTH(16)) sna_dataslot_id_sync(sna_dataslot_id_74, sna_dataslot_id_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) sna_dataslot_size_sync(sna_dataslot_size_74, sna_dataslot_size_cpc, cpc_clk);
+synch_3 apf_initial_dataslots_done_sync(dataslot_allcomplete, apf_initial_dataslots_done_cpc, cpc_clk);
+synch_3 apf_rom_write_active_sync(apf_rom_write_active_74, apf_rom_write_active_cpc, cpc_clk);
+synch_3 apf_boot_rom_seen_sync(apf_boot_rom_seen_74, apf_boot_rom_seen_cpc, cpc_clk);
+synch_3 apf_custom_rom_seen_sync(apf_custom_rom_seen_74, apf_custom_rom_seen_cpc, cpc_clk);
 synch_3 #(.WIDTH(32)) interact_config_sync(interact_config, interact_config_cpc, cpc_clk);
 synch_3 target_dataslot_ack_sync(target_dataslot_ack, target_dataslot_ack_cpc, cpc_clk);
 synch_3 target_dataslot_done_sync(target_dataslot_done, target_dataslot_done_cpc, cpc_clk);
@@ -1377,9 +1600,113 @@ always @(posedge cpc_clk) begin
     end
 end
 
-assign bridge_rd_data = snapshot_save_bridge_selected ? snapshot_save_bridge_rd_data :
+assign bridge_rd_data = cpc_savestate_bridge_selected ? cpc_savestate_bridge_rd_data :
+                        snapshot_save_bridge_selected ? snapshot_save_bridge_rd_data :
                         (bridge_addr[31:24] == 8'hf8) ? cmd_bridge_rd_data :
                         regs_bridge_rd_data;
+
+always @(posedge clk_74a or negedge core_reset_n) begin
+    if (!core_reset_n) begin
+        savestate_debug_prev_load_err_74 <= 1'b0;
+        savestate_debug_prev_load_ok_74  <= 1'b0;
+        savestate_debug_event_index_74   <= 5'd0;
+        savestate_debug_event_marker_74  <= 32'h5353_4C45;
+        savestate_target_debug_event_74  <= 1'b0;
+        savestate_target_debug_data_74   <= 32'd0;
+    end else begin
+        savestate_debug_prev_load_err_74 <= cpc_savestate_load_err;
+        savestate_debug_prev_load_ok_74  <= cpc_savestate_load_ok;
+        savestate_target_debug_event_74  <= 1'b0;
+
+        if (savestate_debug_event_index_74 == 5'd0) begin
+            if (!savestate_debug_prev_load_err_74 && cpc_savestate_load_err) begin
+                savestate_debug_event_marker_74 <= 32'h5353_4C45; // "SSLE"
+                savestate_debug_event_index_74  <= 5'd1;
+            end else if (!savestate_debug_prev_load_ok_74 && cpc_savestate_load_ok) begin
+                savestate_debug_event_marker_74 <= 32'h5353_4F4B; // "SSOK"
+                savestate_debug_event_index_74  <= 5'd1;
+            end
+        end
+
+        if ((bridge_target_state == 4'd0) && (savestate_debug_event_index_74 != 5'd0)) begin
+            savestate_target_debug_event_74 <= 1'b1;
+            case (savestate_debug_event_index_74)
+                5'd1: begin
+                    savestate_target_debug_data_74 <= savestate_debug_event_marker_74;
+                    savestate_debug_event_index_74 <= 5'd2;
+                end
+                5'd2: begin
+                    savestate_target_debug_data_74 <= savestate_debug_save_readback_word0_74;
+                    savestate_debug_event_index_74 <= 5'd3;
+                end
+                5'd3: begin
+                    savestate_target_debug_data_74 <= savestate_debug_save_readback_word1_74;
+                    savestate_debug_event_index_74 <= 5'd4;
+                end
+                5'd4: begin
+                    savestate_target_debug_data_74 <= savestate_debug_save_readback_word2_74;
+                    savestate_debug_event_index_74 <= 5'd5;
+                end
+                5'd5: begin
+                    savestate_target_debug_data_74 <= savestate_debug_save_readback_word3_74;
+                    savestate_debug_event_index_74 <= 5'd6;
+                end
+                5'd6: begin
+                    savestate_target_debug_data_74 <= savestate_debug_bridge_prime_word0_74;
+                    savestate_debug_event_index_74 <= 5'd7;
+                end
+                5'd7: begin
+                    savestate_target_debug_data_74 <= savestate_debug_bridge_prime_word1_74;
+                    savestate_debug_event_index_74 <= 5'd8;
+                end
+                5'd8: begin
+                    savestate_target_debug_data_74 <= savestate_debug_status_74;
+                    savestate_debug_event_index_74 <= 5'd9;
+                end
+                5'd9: begin
+                    savestate_target_debug_data_74 <= savestate_debug_progress_74;
+                    savestate_debug_event_index_74 <= 5'd10;
+                end
+                5'd10: begin
+                    savestate_target_debug_data_74 <= savestate_debug_addresses_74;
+                    savestate_debug_event_index_74 <= 5'd11;
+                end
+                5'd11: begin
+                    savestate_target_debug_data_74 <= savestate_debug_last_load_word_raw_74;
+                    savestate_debug_event_index_74 <= 5'd12;
+                end
+                5'd12: begin
+                    savestate_target_debug_data_74 <= savestate_debug_last_load_word_norm_74;
+                    savestate_debug_event_index_74 <= 5'd13;
+                end
+                5'd13: begin
+                    savestate_target_debug_data_74 <= savestate_debug_load_header_word0_74;
+                    savestate_debug_event_index_74 <= 5'd14;
+                end
+                5'd14: begin
+                    savestate_target_debug_data_74 <= savestate_debug_load_header_word1_74;
+                    savestate_debug_event_index_74 <= 5'd15;
+                end
+                5'd15: begin
+                    savestate_target_debug_data_74 <= savestate_debug_bridge_flags_74;
+                    savestate_debug_event_index_74 <= 5'd16;
+                end
+                5'd16: begin
+                    savestate_target_debug_data_74 <= savestate_debug_top_state_74;
+                    savestate_debug_event_index_74 <= 5'd17;
+                end
+                5'd17: begin
+                    savestate_target_debug_data_74 <= savestate_debug_cpu_pcsp_74;
+                    savestate_debug_event_index_74 <= 5'd0;
+                end
+                default: begin
+                    savestate_target_debug_data_74 <= savestate_debug_event_marker_74;
+                    savestate_debug_event_index_74 <= 5'd0;
+                end
+            endcase
+        end
+    end
+end
 
 pocket_bridge_regs regs (
     .clk            ( clk_74a ),
@@ -1399,9 +1726,130 @@ pocket_bridge_regs regs (
     .loader_addr    ( loader_addr ),
     .loader_data    ( loader_data ),
     .loader_command ( loader_command ),
+    .savestate_debug_status        ( savestate_debug_status ),
+    .savestate_debug_progress      ( savestate_debug_progress ),
+    .savestate_debug_addresses     ( savestate_debug_addresses ),
+    .savestate_debug_bridge_flags  ( savestate_debug_bridge_flags ),
+    .savestate_debug_last_load_word_raw  ( savestate_debug_last_load_word_raw ),
+    .savestate_debug_last_load_word_norm ( savestate_debug_last_load_word_norm ),
+    .savestate_debug_load_header_word0   ( savestate_debug_load_header_word0 ),
+    .savestate_debug_load_header_word1   ( savestate_debug_load_header_word1 ),
+    .savestate_debug_save_readback_word0 ( savestate_debug_save_readback_word0 ),
+    .savestate_debug_save_readback_word1 ( savestate_debug_save_readback_word1 ),
+    .savestate_debug_bridge_prime_word0  ( savestate_debug_bridge_prime_word0 ),
+    .savestate_debug_bridge_prime_word1  ( savestate_debug_bridge_prime_word1 ),
+    .savestate_debug_bridge_host_write_count ( savestate_debug_bridge_host_write_count ),
+    .savestate_debug_bridge_last_host_write  ( savestate_debug_bridge_last_host_write ),
     .restart_request_toggle ( restart_request_toggle ),
     .snapshot_save_request_toggle ( snapshot_save_request_toggle ),
     .status         ( bridge_status )
+);
+
+cpc_savestate_controller savestate_ctrl (
+    .bridge_clk                  ( clk_74a ),
+    .clk                         ( cpc_clk ),
+    .reset_n                     ( cpc_loader_reset_n ),
+    .bridge_addr                 ( bridge_addr ),
+    .bridge_rd                   ( bridge_rd ),
+    .bridge_wr                   ( bridge_wr ),
+    .bridge_wr_data              ( bridge_wr_data ),
+    .bridge_rd_data              ( cpc_savestate_bridge_rd_data ),
+    .bridge_selected             ( cpc_savestate_bridge_selected ),
+    .savestate_start             ( savestate_start ),
+    .savestate_start_ack_s       ( cpc_savestate_start_ack ),
+    .savestate_start_busy_s      ( cpc_savestate_start_busy ),
+    .savestate_start_ok_s        ( cpc_savestate_start_ok ),
+    .savestate_start_err_s       ( cpc_savestate_start_err ),
+    .savestate_load              ( savestate_load ),
+    .savestate_load_ack_s        ( cpc_savestate_load_ack ),
+    .savestate_load_busy_s       ( cpc_savestate_load_busy ),
+    .savestate_load_ok_s         ( cpc_savestate_load_ok ),
+    .savestate_load_err_s        ( cpc_savestate_load_err ),
+    .save_safe                   ( cpc_savestate_save_safe ),
+    .save_defer_ok               ( cpc_savestate_save_defer_ok ),
+    .load_safe                   ( cpc_savestate_load_safe ),
+    .frame_pulse                 ( cpc_savestate_frame_pulse ),
+    .custom_rom_enable           ( cpc_custom_rom_enable ),
+    .state_model                 ( cpc_state_model ),
+    .state_cpu_dir               ( cpc_state_cpu_dir ),
+    .state_crtc_addr             ( cpc_state_crtc_addr ),
+    .state_crtc_regs             ( cpc_state_crtc_regs ),
+    .state_crtc_v3               ( cpc_state_crtc_v3 ),
+    .state_ga_inksel             ( cpc_state_ga_inksel ),
+    .state_ga_palette            ( cpc_state_ga_palette ),
+    .state_ga_config             ( cpc_state_ga_config ),
+    .state_ga_vsync_delay        ( cpc_state_ga_vsync_delay ),
+    .state_ga_int_scanline       ( cpc_state_ga_int_scanline ),
+    .state_ga_irq_active         ( cpc_state_ga_irq_active ),
+    .state_ram_config            ( cpc_state_ram_config ),
+    .state_rom_select            ( cpc_state_rom_select ),
+    .state_ppi_a                 ( cpc_state_ppi_a ),
+    .state_ppi_b                 ( cpc_state_ppi_b ),
+    .state_ppi_c                 ( cpc_state_ppi_c ),
+    .state_ppi_control           ( cpc_state_ppi_control ),
+    .state_psg_addr              ( cpc_state_psg_addr ),
+    .state_psg_regs              ( cpc_state_psg_regs ),
+    .freeze_cpu                  ( cpc_savestate_freeze_cpu ),
+    .snapshot_busy_reset         ( cpc_savestate_busy_reset ),
+    .snapshot_word_wr            ( cpc_savestate_snapshot_word_wr ),
+    .snapshot_word_addr          ( cpc_savestate_snapshot_word_addr ),
+    .snapshot_word_data          ( cpc_savestate_snapshot_word_data ),
+    .sna_load                    ( cpc_savestate_sna_load ),
+    .sna_cpu_dir                 ( cpc_savestate_sna_cpu_dir ),
+    .sna_crtc_addr               ( cpc_savestate_sna_crtc_addr ),
+    .sna_crtc_regs               ( cpc_savestate_sna_crtc_regs ),
+    .sna_crtc_v3_valid           ( cpc_savestate_sna_crtc_v3_valid ),
+    .sna_crtc_v3                 ( cpc_savestate_sna_crtc_v3 ),
+    .sna_ga_inksel               ( cpc_savestate_sna_ga_inksel ),
+    .sna_ga_palette              ( cpc_savestate_sna_ga_palette ),
+    .sna_ga_config               ( cpc_savestate_sna_ga_config ),
+    .sna_ga_vsync_delay          ( cpc_savestate_sna_ga_vsync_delay ),
+    .sna_ga_int_scanline         ( cpc_savestate_sna_ga_int_scanline ),
+    .sna_ga_irq_active           ( cpc_savestate_sna_ga_irq_active ),
+    .sna_ram_config              ( cpc_savestate_sna_ram_config ),
+    .sna_rom_select              ( cpc_savestate_sna_rom_select ),
+    .sna_ppi_a                   ( cpc_savestate_sna_ppi_a ),
+    .sna_ppi_b                   ( cpc_savestate_sna_ppi_b ),
+    .sna_ppi_c                   ( cpc_savestate_sna_ppi_c ),
+    .sna_ppi_control             ( cpc_savestate_sna_ppi_control ),
+    .sna_psg_addr                ( cpc_savestate_sna_psg_addr ),
+    .sna_psg_regs                ( cpc_savestate_sna_psg_regs ),
+    .sna_model                   ( cpc_savestate_sna_model ),
+    .capture_ram_rd              ( cpc_savestate_capture_ram_rd ),
+    .capture_ram_word_addr       ( cpc_savestate_capture_ram_word_addr ),
+    .capture_ram_word_data       ( cpc_capture_ram_word_data ),
+    .cram_a                      ( cram0_a ),
+    .cram_dq                     ( cram0_dq ),
+    .cram_wait                   ( cram0_wait ),
+    .cram_clk                    ( cram0_clk ),
+    .cram_adv_n                  ( cram0_adv_n ),
+    .cram_cre                    ( cram0_cre ),
+    .cram_ce0_n                  ( cram0_ce0_n ),
+    .cram_ce1_n                  ( cram0_ce1_n ),
+    .cram_oe_n                   ( cram0_oe_n ),
+    .cram_we_n                   ( cram0_we_n ),
+    .cram_ub_n                   ( cram0_ub_n ),
+    .cram_lb_n                   ( cram0_lb_n ),
+    .debug_status                ( savestate_debug_status ),
+    .debug_progress              ( savestate_debug_progress ),
+    .debug_addresses             ( savestate_debug_addresses ),
+    .debug_bridge_flags          ( savestate_debug_bridge_flags ),
+    .debug_last_load_word_raw    ( savestate_debug_last_load_word_raw ),
+    .debug_last_load_word_norm   ( savestate_debug_last_load_word_norm ),
+    .debug_load_header_word0     ( savestate_debug_load_header_word0 ),
+    .debug_load_header_word1     ( savestate_debug_load_header_word1 ),
+    .debug_save_readback_word0   ( savestate_debug_save_readback_word0 ),
+    .debug_save_readback_word1   ( savestate_debug_save_readback_word1 ),
+    .debug_save_readback_word2   ( savestate_debug_save_readback_word2 ),
+    .debug_save_readback_word3   ( savestate_debug_save_readback_word3 ),
+    .debug_bridge_prime_word0    ( savestate_debug_bridge_prime_word0 ),
+    .debug_bridge_prime_word1    ( savestate_debug_bridge_prime_word1 ),
+    .debug_bridge_host_write_count ( savestate_debug_bridge_host_write_count ),
+    .debug_bridge_last_host_write  ( savestate_debug_bridge_last_host_write ),
+    .load_progress_active        ( cpc_savestate_load_progress_active ),
+    .load_progress_words         ( cpc_savestate_load_progress_words ),
+    .load_progress_128k          ( cpc_savestate_load_progress_128k ),
+    .load_progress_complete      ( cpc_savestate_load_progress_complete )
 );
 
 pocket_sna_save_dataslot snapshot_save (
@@ -1456,73 +1904,24 @@ pocket_sna_save_dataslot snapshot_save (
     .save_err                    ( cpc_snapshot_save_err )
 );
 
-pocket_dataslot_loader #(
-    .SLOT_ID     ( 16'h0200 ),
-    .TOTAL_BYTES ( 32'h0002_8000 )
-) rom_loader (
-    .clk                         ( cpc_clk ),
-    .bridge_clk                  ( clk_74a ),
-    .reset_n                     ( cpc_loader_reset_n ),
-    .start                       ( host_reset_n_cpc ),
-    .bridge_addr                 ( bridge_addr ),
-    .bridge_wr                   ( bridge_wr ),
-    .bridge_wr_data              ( bridge_wr_data ),
-    .datatable_addr              ( rom_loader_datatable_addr_unused ),
-    .datatable_q                 ( datatable_q ),
-    .target_dataslot_read        ( rom_target_dataslot_read ),
-    .target_dataslot_id          ( rom_target_dataslot_id ),
-    .target_dataslot_slotoffset  ( rom_target_dataslot_slotoffset ),
-    .target_dataslot_bridgeaddr  ( rom_target_dataslot_bridgeaddr ),
-    .target_dataslot_length      ( rom_target_dataslot_length ),
-    .cmd_request_flag            ( loader_cmd_request_flag ),
-    .cmd_write_strobe            ( loader_cmd_write_strobe ),
-    .cmd_ack_flag                ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : bridge_cmd_ack_flag ),
-    .target_dataslot_ack         ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_ack_cpc ),
-    .target_dataslot_done        ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 1'b0 : target_dataslot_done_cpc ),
-    .target_dataslot_err         ( (custom_rom_client_selected || snapshot_save_client_selected || sna_client_selected || tape_client_selected || fdc_client_selected) ? 3'd0 : target_dataslot_err_cpc ),
-    .loader_wr                   ( cpc_loader_wr ),
-    .loader_addr                 ( cpc_loader_addr ),
-    .loader_data                 ( cpc_loader_data ),
-    .loader_done                 ( cpc_loader_done ),
-    .loader_error                ( cpc_loader_error ),
-    .target_active               ( rom_target_active ),
-    .debug_state                 ( cpc_loader_state ),
-    .debug_offset                ( cpc_loader_offset )
-);
-
-pocket_dataslot_loader #(
-    .SLOT_ID          ( 16'h0208 ),
-    .TOTAL_BYTES      ( 32'h0000_4000 ),
-    .LOADER_ADDR_BASE ( 18'h28000 )
-) custom_rom_loader (
-    .clk                         ( cpc_clk ),
-    .bridge_clk                  ( clk_74a ),
-    .reset_n                     ( cpc_loader_reset_n ),
-    .start                       ( cpc_custom_rom_loader_start ),
-    .bridge_addr                 ( bridge_addr ),
-    .bridge_wr                   ( bridge_wr ),
-    .bridge_wr_data              ( bridge_wr_data ),
-    .datatable_addr              ( custom_datatable_addr_unused ),
-    .datatable_q                 ( datatable_q ),
-    .target_dataslot_read        ( custom_rom_target_dataslot_read ),
-    .target_dataslot_id          ( custom_rom_target_dataslot_id ),
-    .target_dataslot_slotoffset  ( custom_rom_target_dataslot_slotoffset ),
-    .target_dataslot_bridgeaddr  ( custom_rom_target_dataslot_bridgeaddr ),
-    .target_dataslot_length      ( custom_rom_target_dataslot_length ),
-    .cmd_request_flag            ( custom_rom_loader_cmd_request_flag ),
-    .cmd_write_strobe            ( custom_rom_loader_cmd_write_strobe ),
-    .cmd_ack_flag                ( custom_rom_client_selected ? bridge_cmd_ack_flag : 1'b0 ),
-    .target_dataslot_ack         ( custom_rom_client_selected ? target_dataslot_ack_cpc : 1'b0 ),
-    .target_dataslot_done        ( custom_rom_client_selected ? target_dataslot_done_cpc : 1'b0 ),
-    .target_dataslot_err         ( custom_rom_client_selected ? target_dataslot_err_cpc : 3'd0 ),
-    .loader_wr                   ( cpc_custom_loader_wr ),
-    .loader_addr                 ( cpc_custom_loader_addr ),
-    .loader_data                 ( cpc_custom_loader_data ),
-    .loader_done                 ( cpc_custom_loader_done ),
-    .loader_error                ( cpc_custom_loader_error ),
-    .target_active               ( custom_rom_target_active ),
-    .debug_state                 ( ),
-    .debug_offset                ( )
+pocket_apf_write_loader #(
+    .ADDRESS_MASK_UPPER_4     ( 4'h6 ),
+    .ADDRESS_SIZE             ( 18 ),
+    .WRITE_MEM_CLOCK_DELAY    ( 4 ),
+    .WRITE_MEM_EN_CYCLE_LENGTH( 1 )
+) apf_rom_loader (
+    .clk_74a              ( clk_74a ),
+    .clk_memory           ( cpc_clk ),
+    .reset_n              ( core_reset_n & cpc_pll_ready_74 ),
+    .enable               ( apf_rom_write_active_74 ),
+    .bridge_wr            ( bridge_wr ),
+    .bridge_endian_little ( bridge_endian_little ),
+    .bridge_addr          ( bridge_addr ),
+    .bridge_wr_data       ( bridge_wr_data ),
+    .write_en             ( cpc_loader_wr ),
+    .write_addr           ( cpc_loader_addr ),
+    .write_data           ( cpc_loader_data ),
+    .write_count          ( cpc_loader_offset )
 );
 
 pocket_sna_dataslot sna_loader (
@@ -1553,12 +1952,18 @@ pocket_sna_dataslot sna_loader (
     .snapshot_mem_data           ( cpc_snapshot_mem_data ),
     .snapshot_busy_reset         ( cpc_snapshot_busy_reset ),
     .sna_load                    ( cpc_sna_load ),
+    .freeze_cpu                  ( cpc_sna_freeze_cpu ),
     .sna_cpu_dir                 ( cpc_sna_cpu_dir ),
     .sna_crtc_addr               ( cpc_sna_crtc_addr ),
     .sna_crtc_regs               ( cpc_sna_crtc_regs ),
+    .sna_crtc_v3_valid           ( cpc_sna_crtc_v3_valid ),
+    .sna_crtc_v3                 ( cpc_sna_crtc_v3 ),
     .sna_ga_inksel               ( cpc_sna_ga_inksel ),
     .sna_ga_palette              ( cpc_sna_ga_palette ),
     .sna_ga_config               ( cpc_sna_ga_config ),
+    .sna_ga_vsync_delay          ( cpc_sna_ga_vsync_delay ),
+    .sna_ga_int_scanline         ( cpc_sna_ga_int_scanline ),
+    .sna_ga_irq_active           ( cpc_sna_ga_irq_active ),
     .sna_ram_config              ( cpc_sna_ram_config ),
     .sna_rom_select              ( cpc_sna_rom_select ),
     .sna_ppi_a                   ( cpc_sna_ppi_a ),
@@ -1576,7 +1981,7 @@ pocket_tape_dataslot tape_loader (
     .reset_n                     ( cpc_loader_reset_n ),
     .enable                      ( dataslot_runtime_enable ),
     .pause                       ( cpc_menu_pause_active ),
-    .restart                     ( !cpc_reset_n ),
+    .restart                     ( !cpc_reset_n | cpc_restore_sna_load ),
     .bridge_addr                 ( bridge_addr ),
     .bridge_wr                   ( bridge_wr ),
     .bridge_wr_data              ( bridge_wr_data ),
@@ -1656,9 +2061,9 @@ core_bridge_cmd cmd (
     .dataslot_requestread_id     ( ),
     .dataslot_requestread_ack    ( 1'b1 ),
     .dataslot_requestread_ok     ( 1'b1 ),
-    .dataslot_requestwrite       ( ),
-    .dataslot_requestwrite_id    ( ),
-    .dataslot_requestwrite_size  ( ),
+    .dataslot_requestwrite       ( dataslot_requestwrite ),
+    .dataslot_requestwrite_id    ( dataslot_requestwrite_id ),
+    .dataslot_requestwrite_size  ( dataslot_requestwrite_size ),
     .dataslot_requestwrite_ack   ( 1'b1 ),
     .dataslot_requestwrite_ok    ( 1'b1 ),
     .dataslot_update             ( dataslot_update ),
@@ -1674,21 +2079,22 @@ core_bridge_cmd cmd (
     .rtc_time_bcd                ( rtc_time_bcd ),
     .rtc_valid                   ( rtc_valid ),
 
-    .savestate_supported         ( 1'b0 ),
-    .savestate_addr              ( 32'd0 ),
-    .savestate_size              ( 32'd0 ),
-    .savestate_maxloadsize       ( 32'd0 ),
+    .savestate_supported         ( savestate_supported ),
+    .savestate_addr              ( savestate_addr ),
+    .savestate_size              ( savestate_size ),
+    .savestate_maxloadsize       ( savestate_maxloadsize ),
     .osnotify_inmenu             ( cpc_menu_inmenu ),
-    .savestate_start             ( savestate_start_unused ),
-    .savestate_start_ack         ( 1'b0 ),
-    .savestate_start_busy        ( 1'b0 ),
-    .savestate_start_ok          ( 1'b0 ),
-    .savestate_start_err         ( 1'b0 ),
-    .savestate_load              ( savestate_load_unused ),
-    .savestate_load_ack          ( 1'b0 ),
-    .savestate_load_busy         ( 1'b0 ),
-    .savestate_load_ok           ( 1'b0 ),
-    .savestate_load_err          ( 1'b0 ),
+    .savestate_start             ( savestate_start ),
+    .savestate_start_ack         ( cpc_savestate_start_ack ),
+    .savestate_start_busy        ( cpc_savestate_start_busy ),
+    .savestate_start_ok          ( cpc_savestate_start_ok ),
+    .savestate_start_err         ( cpc_savestate_start_err ),
+    .savestate_load              ( savestate_load ),
+    .savestate_load_ack          ( cpc_savestate_load_ack ),
+    .savestate_load_busy         ( cpc_savestate_load_busy ),
+    .savestate_load_ok           ( cpc_savestate_load_ok ),
+    .savestate_load_err          ( cpc_savestate_load_err ),
+    .savestate_load_progress     ( savestate_load_progress_percent ),
 
     .target_dataslot_read_s      ( target_dataslot_read ),
     .target_dataslot_read_48_s   ( 1'b0 ),
@@ -1696,6 +2102,8 @@ core_bridge_cmd cmd (
     .target_dataslot_write_48_s  ( 1'b0 ),
     .target_dataslot_getfile_s   ( 1'b0 ),
     .target_dataslot_openfile_s  ( snapshot_save_client_selected ? snapshot_save_target_dataslot_openfile : 1'b0 ),
+    .target_debug_event_s        ( savestate_target_debug_event_74 ),
+    .target_debug_event_data_s   ( savestate_target_debug_data_74 ),
     .target_dataslot_ack         ( target_dataslot_ack ),
     .target_dataslot_ack_s       ( target_dataslot_ack_s ),
     .target_dataslot_done        ( target_dataslot_done ),
@@ -1716,18 +2124,16 @@ core_bridge_cmd cmd (
     .datatable_q                 ( datatable_q ),
 
     .i_clk_sync                  ( cpc_clk ),
-    .i_write_strobe              ( custom_rom_client_selected ? custom_rom_loader_cmd_write_strobe :
-                                   snapshot_save_client_selected ? snapshot_save_cmd_write_strobe :
+    .i_write_strobe              ( snapshot_save_client_selected ? snapshot_save_cmd_write_strobe :
                                    sna_client_selected ? sna_cmd_write_strobe :
                                    tape_client_selected ? tape_cmd_write_strobe :
                                    fdc_client_selected ? fdc_cmd_write_strobe :
-                                   loader_cmd_write_strobe ),
-    .i_request_flag              ( custom_rom_client_selected ? custom_rom_loader_cmd_request_flag :
-                                   snapshot_save_client_selected ? snapshot_save_cmd_request_flag :
+                                   1'b0 ),
+    .i_request_flag              ( snapshot_save_client_selected ? snapshot_save_cmd_request_flag :
                                    sna_client_selected ? sna_cmd_request_flag :
                                    tape_client_selected ? tape_cmd_request_flag :
                                    fdc_client_selected ? fdc_cmd_request_flag :
-                                   loader_cmd_request_flag ),
+                                   1'b0 ),
 	    .o_ack_flag                  ( bridge_cmd_ack_flag ),
 	    .debug_tstate                ( bridge_target_state ),
 	    .debug_target_status         ( bridge_target_status ),

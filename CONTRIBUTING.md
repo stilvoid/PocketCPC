@@ -15,8 +15,9 @@ Read these first:
 4. `docs/COMPONENT_MAP.md`
 5. `docs/CPC_IMPORT_MANIFEST.md` if you are touching imported CPC machine files
 6. `docs/ROM_ASSET_LAYOUT.md` if you are changing `boot.rom` handling or ROM assumptions
-7. `TODO.md` for the current backlog
-8. `CHANGELOG.md` when preparing a release or release notes
+7. `docs/SAVESTATE_DEVLOG.md` if you are touching Pocket savestates or Memories
+8. `TODO.md` for the current backlog
+9. `CHANGELOG.md` when preparing a release or release notes
 
 If you plan a large change, open an issue or start a discussion first. Small,
 focused pull requests are much easier to review and validate on hardware.
@@ -49,6 +50,7 @@ and stand behind the submitted changes.
 Useful commands:
 
 ```bash
+make validate
 make build
 make report
 make install
@@ -57,6 +59,7 @@ make dist
 
 Notes:
 
+- `make validate` syncs `src/fpga/` into `build/quartus/` and runs Quartus Analysis & Elaboration in Docker. It is the cheap pre-compile check for HDL syntax, hierarchy, project file coverage, and assignment/elaboration errors, without running fit, timing, or bitstream packaging.
 - `make build` stages a complete installable package under `build/package/`, uses `build/quartus/` as the Quartus workspace, rebuilds the bitstream only when tracked FPGA inputs changed, and refreshes the staged metadata when git version inputs changed.
 - `make report` prints a concise Quartus flow, fit, and timing summary from the current build outputs.
 - `make install` is available for local SD-card installs and depends on `make dist`.

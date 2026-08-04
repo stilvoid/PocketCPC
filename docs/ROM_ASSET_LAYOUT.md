@@ -36,6 +36,19 @@ Current build and packaging assumptions:
 - the current experiment exposes that slot on CPC 6128, CPC 664, and CPC 464
 - the current experiment exposes only that one extra expansion ROM page
 
+## Pocket loading contract
+
+`boot.rom` is APF data slot `0x200` and is mapped to bridge address
+`0x60000000`.
+
+`custom.rom` is APF data slot `0x208` and is mapped to bridge address
+`0x60028000`.
+
+These ROM slots are not `deferload` slots. The Pocket host writes them during
+normal setup, and `src/fpga/core/pocket_apf_write_loader.sv` streams those APF
+bridge writes into the existing CPC ROM RAM. Runtime media slots such as `.dsk`,
+`.cdt`, and `.sna` remain deferred and use target commands after startup.
+
 ## Why bundle ROMs?
 
 The ZX Spectrum Pocket core uses a consolidated `boot.rom` model. That same shape is convenient here because it avoids multiple early file-loading paths and lets the CPC machine see deterministic ROM pages at reset.

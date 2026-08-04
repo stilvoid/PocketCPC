@@ -52,9 +52,14 @@ PACKAGE_TEMPLATE_INPUTS := $(shell find \
 
 .DEFAULT_GOAL := build
 
-.PHONY: build install dist clean report
+.PHONY: build validate install dist clean report
 
 build: $(STAGE_STAMP) $(STAGED_CORE_JSON) $(STAGED_BITSTREAM) $(STAGED_BUILD_INFO)
+
+validate: $(QUARTUS_SYNC_STAMP) scripts/build_core_docker.sh
+	POCKETCPC_STATE_DIR="$(QUARTUS_DIR)/validate_monitor" \
+	QUARTUS_DOCKER_CONTAINER="pocketcpc-quartus-validate" \
+	bash scripts/build_core_docker.sh validate
 
 report: $(STAGED_CORE_JSON) $(STAGED_BITSTREAM) $(STAGED_BUILD_INFO) $(REPORT_SCRIPT)
 	python3 "$(REPORT_SCRIPT)" $(if $(filter 0 false no off,$(REPORT_STRICT)),,--strict)
@@ -87,7 +92,7 @@ $(STAGED_CORE_JSON): $(STAGE_STAMP) $(CORE_JSON_TEMPLATE) scripts/update_core_me
 	python3 scripts/update_core_metadata.py "$@"
 
 $(QUARTUS_BUILD_STAMP): $(QUARTUS_SYNC_STAMP) scripts/build_core_docker.sh scripts/reverse_rbf_bits.py
-	scripts/build_core_docker.sh
+	bash scripts/build_core_docker.sh
 	@test -f "$(STAGED_BITSTREAM)"
 	@test -f "$(STAGED_BUILD_INFO)"
 	touch "$@"

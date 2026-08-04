@@ -68,6 +68,7 @@ modified locally. Examples include imported or adapted CPC machine files such as
 - `src/fpga/cpc/GA40010/video.sv`
 - `src/fpga/core/sound_i2s.sv`
 - `src/fpga/core/sync_fifo.sv`
+- `src/fpga/core/pocket_apf_write_loader.sv`
 
 For these files, the preserved file headers and upstream license notices control.
 
@@ -77,7 +78,6 @@ The repository also contains PocketCPC-specific integration code written for the
 boundary between the reference cores and the Pocket platform. Examples include:
 
 - `src/fpga/core/pocket_bridge_regs.sv`
-- `src/fpga/core/pocket_dataslot_loader.sv`
 - `src/fpga/core/pocket_fdc_dataslot.sv`
 - `src/fpga/core/pocket_tape_dataslot.sv`
 - `src/fpga/core/pocket_sna_dataslot.sv`

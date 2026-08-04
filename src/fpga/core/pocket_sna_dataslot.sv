@@ -40,12 +40,18 @@ module pocket_sna_dataslot (
     output reg  [7:0]   snapshot_mem_data,
     output wire         snapshot_busy_reset,
     output wire         sna_load,
+    output wire         freeze_cpu,
     output reg  [211:0] sna_cpu_dir,
     output reg  [4:0]   sna_crtc_addr,
     output reg  [143:0] sna_crtc_regs,
+    output reg          sna_crtc_v3_valid,
+    output reg  [63:0]  sna_crtc_v3,
     output reg  [4:0]   sna_ga_inksel,
     output reg  [135:0] sna_ga_palette,
     output reg  [7:0]   sna_ga_config,
+    output reg  [7:0]   sna_ga_vsync_delay,
+    output reg  [7:0]   sna_ga_int_scanline,
+    output reg          sna_ga_irq_active,
     output reg  [7:0]   sna_ram_config,
     output reg  [7:0]   sna_rom_select,
     output reg  [7:0]   sna_ppi_a,
@@ -95,6 +101,7 @@ reg  [15:0] sna_mem_size = 16'd64;
 assign target_active = (state != ST_IDLE) && (state != ST_APPLY_WAIT);
 assign snapshot_busy_reset = target_active | (sna_apply_cnt > 3'd2);
 assign sna_load = (sna_apply_cnt == 3'd1);
+assign freeze_cpu = 1'b0;
 
 function automatic [7:0] bridge_byte;
     input [31:0] word;
@@ -150,9 +157,14 @@ always @(posedge clk or negedge reset_n) begin
         sna_cpu_dir                <= 212'd0;
         sna_crtc_addr              <= 5'd0;
         sna_crtc_regs              <= 144'd0;
+        sna_crtc_v3_valid          <= 1'b0;
+        sna_crtc_v3                <= 64'd0;
         sna_ga_inksel              <= 5'd0;
         sna_ga_palette             <= 136'd0;
         sna_ga_config              <= 8'd0;
+        sna_ga_vsync_delay         <= 8'd0;
+        sna_ga_int_scanline        <= 8'd0;
+        sna_ga_irq_active          <= 1'b0;
         sna_ram_config             <= 8'd0;
         sna_rom_select             <= 8'd0;
         sna_ppi_a                  <= 8'd0;
@@ -187,9 +199,14 @@ always @(posedge clk or negedge reset_n) begin
                     sna_cpu_dir       <= 212'd0;
                     sna_crtc_addr     <= 5'd0;
                     sna_crtc_regs     <= 144'd0;
+                    sna_crtc_v3_valid <= 1'b0;
+                    sna_crtc_v3       <= 64'd0;
                     sna_ga_inksel     <= 5'd0;
                     sna_ga_palette    <= 136'd0;
                     sna_ga_config     <= 8'd0;
+                    sna_ga_vsync_delay <= 8'd0;
+                    sna_ga_int_scanline <= 8'd0;
+                    sna_ga_irq_active <= 1'b0;
                     sna_ram_config    <= 8'd0;
                     sna_rom_select    <= 8'd0;
                     sna_ppi_a         <= 8'd0;
@@ -261,6 +278,7 @@ always @(posedge clk or negedge reset_n) begin
 
                 if (current_byte_addr < SNAPSHOT_HDR_SIZE) begin
                     case (current_byte_addr_lo)
+                        8'h10: sna_crtc_v3_valid    <= (current_byte == 8'd3);
                         8'h11: sna_cpu_dir[15:8]    <= current_byte;
                         8'h12: sna_cpu_dir[7:0]     <= current_byte;
                         8'h13: sna_cpu_dir[87:80]   <= current_byte;
@@ -318,6 +336,17 @@ always @(posedge clk or negedge reset_n) begin
                                 endcase
                             end
                         end
+                        8'ha9: sna_crtc_v3[7:0]     <= current_byte;
+                        8'hab: sna_crtc_v3[15:8]    <= current_byte;
+                        8'hac: sna_crtc_v3[23:16]   <= current_byte;
+                        8'had: sna_crtc_v3[31:24]   <= current_byte;
+                        8'hae: sna_crtc_v3[39:32]   <= current_byte;
+                        8'haf: sna_crtc_v3[47:40]   <= current_byte;
+                        8'hb0: sna_crtc_v3[55:48]   <= current_byte;
+                        8'hb1: sna_crtc_v3[63:56]   <= current_byte;
+                        8'hb2: sna_ga_vsync_delay   <= current_byte;
+                        8'hb3: sna_ga_int_scanline  <= current_byte;
+                        8'hb4: sna_ga_irq_active    <= current_byte[0];
                         default: begin end
                     endcase
 

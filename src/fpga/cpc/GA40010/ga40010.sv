@@ -77,9 +77,16 @@ module ga40010 (
 	input  [4:0] SNA_INKSEL,
 	input [135:0] SNA_PALETTE,
 	input  [7:0] SNA_CONFIG,
+	input        SNA_GA_V3_VALID,
+	input  [7:0] SNA_GA_VSYNC_DELAY,
+	input  [7:0] SNA_GA_INT_SCANLINE,
+	input        SNA_GA_IRQ_ACTIVE,
 	output [4:0] STATE_INKSEL,
 	output [135:0] STATE_PALETTE,
-	output [7:0] STATE_CONFIG
+	output [7:0] STATE_CONFIG,
+	output [7:0] STATE_GA_VSYNC_DELAY,
+	output [7:0] STATE_GA_INT_SCANLINE,
+	output       STATE_GA_IRQ_ACTIVE
 );
 
 wire reset = ~RESET_N;

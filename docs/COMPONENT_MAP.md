@@ -4,6 +4,17 @@ This map is governed by `AGENTS.md`: reuse MiSTer Amstrad for CPC machine
 behavior, reuse the ZX Spectrum Pocket core for APF/Pocket integration, and
 keep new code to the adapter layer where those references meet.
 
+## Use from openfpga-GBC core
+
+Use this as a targeted reference where licence permits:
+
+| Area | Source | Use |
+| --- | --- | --- |
+| Pocket savestate load timing | `upstreams/openfpga-GBC/src/gb/save_state_controller.sv` | Reference a working Memories implementation that treats the savestate blob as already copied into the core-visible buffer before `savestate_load` begins restore work. |
+| PSRAM controller | `upstreams/openfpga-GBC/src/gb/psram.sv` | Secondary reference for the same proven Pocket `cram*` interface used for large staging buffers. |
+| APF setup data-slot writes | `upstreams/openfpga-GBC/src/gb/data_loader.sv` | Adapt the bridge-write FIFO pattern for normal APF-loaded assets such as `boot.rom` and `custom.rom`. |
+| Pocket savestate metadata | `upstreams/openfpga-GBC/pkg/gbc/Cores/budude2.GBC/core.json` | Reference a shipped core that advertises working sleep and Memories support. |
+
 ## Use from OpenFPGA ZX Spectrum core
 
 Use these as direct references or adaptation patterns where licence permits:
@@ -12,6 +23,7 @@ Use these as direct references or adaptation patterns where licence permits:
 | --- | --- | --- |
 | `apf_top.v` style wrapper | `src/fpga/apf/apf_top.v` | Copy/adapt physical Pocket pins, scaler DDR output, bridge peripheral, controller plumbing. |
 | `core_top.sv` APF signature | `src/fpga/core/core_top.sv` | Use port list shape for new Amstrad-facing top. |
+| PSRAM controller | `upstreams/OpenFPGA_ZX-Spectrum/src/fpga/core/psram.sv` | Copy/adapt the proven Pocket `cram*` controller when a large off-chip staging buffer is needed. |
 | Quartus project shape | `src/fpga/ap_core.qsf`, SDC/IP files | Start from this project layout, then replace Spectrum source files with CPC source files. |
 | Bridge register style | ZX core bridge usage | Implement CPC menu/register/file-slot commands using APF bridge. |
 | Video output wrapper | ZX `core_top.sv` APF video section | Reuse registered `video_rgb`, `video_de`, `video_hs`, `video_vs`, scaler clock, and scaler metadata patterns. |

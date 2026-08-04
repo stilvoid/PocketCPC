@@ -21,12 +21,17 @@ for PocketCPC.
 Build from the repository root with:
 
 ```bash
+make validate
 make build
 ```
 
-The Docker build uses `raetro/quartus:18.1` by default, compiles from a synced
-workspace under `build/quartus/`, and stages the finished installable package
-under `build/package/`.
+`make validate` runs Quartus Analysis & Elaboration in Docker from the synced
+workspace under `build/quartus/`. It is the cheap project-level validation step
+for syntax, hierarchy, and source-list issues.
+
+`make build` uses the same `raetro/quartus:18.1` image, compiles from the
+synced workspace under `build/quartus/`, and stages the finished installable
+package under `build/package/`.
 
 `src/fpga/ap_core.qpf` remains the source-of-truth Quartus project definition,
 but Quartus should write its generated files only under `build/quartus/` via

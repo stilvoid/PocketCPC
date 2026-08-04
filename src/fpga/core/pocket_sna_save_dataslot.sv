@@ -85,11 +85,13 @@ localparam [4:0]
     ST_FILL_HEADER        = 5'd6,
     ST_FILL_MEM_REQ0      = 5'd7,
     ST_FILL_MEM_WAIT0     = 5'd8,
-    ST_FILL_MEM_WAIT1     = 5'd9,
-    ST_CHUNK_NEXT         = 5'd10,
-    ST_WRITE_HOLD         = 5'd11,
-    ST_WAIT_WRITE_CMD_ACK = 5'd12,
-    ST_WAIT_WRITE_DONE    = 5'd13;
+    ST_FILL_MEM_REQ1      = 5'd9,
+    ST_FILL_MEM_WAIT1     = 5'd10,
+    ST_FILL_MEM_STORE     = 5'd11,
+    ST_CHUNK_NEXT         = 5'd12,
+    ST_WRITE_HOLD         = 5'd13,
+    ST_WAIT_WRITE_CMD_ACK = 5'd14,
+    ST_WAIT_WRITE_DONE    = 5'd15;
 
 reg  [4:0]   state = ST_IDLE;
 reg  [31:0]  file_offset = 32'd0;
@@ -628,7 +630,15 @@ always @(posedge clk or negedge reset_n) begin
                 state                   <= ST_FILL_MEM_WAIT0;
             end
 
+            // The shared CPC RAM capture port has a registered address path.
+            // Hold each requested word address for a full cycle before sampling.
             ST_FILL_MEM_WAIT0: begin
+                capture_ram_rd          <= 1'b1;
+                capture_ram_word_addr   <= mem_word_base;
+                state                   <= ST_FILL_MEM_REQ1;
+            end
+
+            ST_FILL_MEM_REQ1: begin
                 saved_word_lo           <= capture_ram_word_data;
                 capture_ram_rd          <= 1'b1;
                 capture_ram_word_addr   <= mem_word_base + 16'd1;
@@ -636,6 +646,13 @@ always @(posedge clk or negedge reset_n) begin
             end
 
             ST_FILL_MEM_WAIT1: begin
+                capture_ram_rd          <= 1'b1;
+                capture_ram_word_addr   <= mem_word_base + 16'd1;
+                state                   <= ST_FILL_MEM_STORE;
+            end
+
+            ST_FILL_MEM_STORE: begin
+                capture_ram_rd <= 1'b1;
                 buffer_b_wr   <= 1'b1;
                 buffer_b_addr <= chunk_word_index;
                 buffer_b_din  <= {

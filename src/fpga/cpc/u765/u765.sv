@@ -54,7 +54,8 @@ module u765 #(parameter CYCLES = 20'd4000, SPECCY_SPEEDLOCK_HACK = 0)
 	input      [8:0] sd_buff_addr,
 	input      [7:0] sd_buff_dout,
 	output     [7:0] sd_buff_din,
-	input            sd_buff_wr
+	input            sd_buff_wr,
+	output reg       state_idle
 );
 
 /* verilator lint_off WIDTH */
@@ -372,6 +373,7 @@ always @(posedge clk_sys) begin : fdc
 	reg [7:0] i_eot;
 	//reg [7:0] i_gpl;
 	reg [7:0] i_dtl;
+
 	reg [7:0] i_sc;
 	//reg [7:0] i_d;
 	reg i_bc; //bad cylinder
@@ -477,6 +479,7 @@ always @(posedge clk_sys) begin : fdc
 
 	//the FDC
 	if (reset) begin
+		state_idle <= 1'b1;
 		sd_rd_mount <= 0;
 		sd_rd_tinfo <= 0;
 		sd_rd_sector <= 0;
@@ -517,7 +520,12 @@ always @(posedge clk_sys) begin : fdc
 		i_scan_lock <= 0;
 		i_srt <= 4;
 		tinfo_lock <= 0;
-	end else if (ce) begin
+	end else begin
+		state_idle <= (state == COMMAND_IDLE) &&
+		              !sd_busy_mount &&
+		              !sd_busy_tinfo &&
+		              !sd_busy_sector;
+	if (ce) begin
 
 		old_wr <= wr;
 		old_rd <= rd;
@@ -1491,6 +1499,7 @@ always @(posedge clk_sys) begin : fdc
 
 		endcase //status
 
+	end
 	end
 end
 

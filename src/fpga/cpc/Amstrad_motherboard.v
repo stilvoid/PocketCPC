@@ -45,9 +45,15 @@ module Amstrad_motherboard
 	input [211:0] sna_cpu_dir,
 	input   [4:0] sna_crtc_addr,
 	input [143:0] sna_crtc_regs,
+	input         sna_crtc_v3_valid,
+	input  [63:0] sna_crtc_v3,
 	input   [4:0] sna_ga_inksel,
 	input [135:0] sna_ga_palette,
 	input   [7:0] sna_ga_config,
+	input         sna_ga_v3_valid,
+	input   [7:0] sna_ga_vsync_delay,
+	input   [7:0] sna_ga_int_scanline,
+	input         sna_ga_irq_active,
 	input   [7:0] sna_ram_config,
 	input   [7:0] sna_rom_select,
 	input   [7:0] sna_ppi_a,
@@ -107,9 +113,13 @@ module Amstrad_motherboard
 	output [211:0] cpu_state,
 	output   [4:0] crtc_state_addr,
 	output [143:0] crtc_state_regs,
+	output  [63:0] crtc_state_v3,
 	output   [4:0] ga_state_inksel,
 	output [135:0] ga_state_palette,
 	output   [7:0] ga_state_config,
+	output   [7:0] ga_state_vsync_delay,
+	output   [7:0] ga_state_int_scanline,
+	output         ga_state_irq_active,
 	output   [7:0] mmu_state_ram_config,
 	output   [7:0] mmu_state_rom_select,
 	output   [7:0] ppi_state_a,
@@ -198,6 +208,8 @@ UM6845R CRTC
 	.SNA_LOAD(sna_load),
 	.SNA_ADDR(sna_crtc_addr),
 	.SNA_REGS(sna_crtc_regs),
+	.SNA_CRTC_V3_VALID(sna_crtc_v3_valid),
+	.SNA_CRTC_V3(sna_crtc_v3),
 
 	.VSYNC(crtc_vs),
 	.HSYNC(crtc_hs),
@@ -208,7 +220,8 @@ UM6845R CRTC
 	.MA(MA),
 	.RA(RA),
 	.STATE_ADDR(crtc_state_addr),
-	.STATE_REGS(crtc_state_regs)
+	.STATE_REGS(crtc_state_regs),
+	.STATE_CRTC_V3(crtc_state_v3)
 );
 
 wire [14:0] crtc_vram_addr = {MA[13:12], RA[2:0], MA[9:0]};
@@ -314,9 +327,16 @@ ga40010 GateArray (
 	.SNA_INKSEL(sna_ga_inksel),
 	.SNA_PALETTE(sna_ga_palette),
 	.SNA_CONFIG(sna_ga_config),
+	.SNA_GA_V3_VALID(sna_ga_v3_valid),
+	.SNA_GA_VSYNC_DELAY(sna_ga_vsync_delay),
+	.SNA_GA_INT_SCANLINE(sna_ga_int_scanline),
+	.SNA_GA_IRQ_ACTIVE(sna_ga_irq_active),
 	.STATE_INKSEL(ga_state_inksel),
 	.STATE_PALETTE(ga_state_palette),
-	.STATE_CONFIG(ga_state_config)
+	.STATE_CONFIG(ga_state_config),
+	.STATE_GA_VSYNC_DELAY(ga_state_vsync_delay),
+	.STATE_GA_INT_SCANLINE(ga_state_int_scanline),
+	.STATE_GA_IRQ_ACTIVE(ga_state_irq_active)
 );
 
 Amstrad_MMU MMU

@@ -41,6 +41,18 @@ around the imported machine pieces:
 | `cpc/cpc_machine_pocket.sv` | Wraps the imported CPC machine for Pocket clocks, reset, media, and I/O boundaries. |
 | `cpc/cpc_ram_rom.sv` | Provides the ROM and RAM implementation expected by the imported motherboard while fitting PocketCPC resource/layout choices. |
 
+## Local modifications to imported logic
+
+The following imported files carry deliberate PocketCPC-local changes and need
+extra care during upstream refreshes:
+
+| Local path | Local change |
+| --- | --- |
+| `cpc/UM6845R.v` | Adds SNA v3 CRTC timing-state export/restore ports for Pocket savestate fidelity. |
+| `cpc/GA40010/ga40010.sv` | Carries SNA v3 Gate Array interrupt-state ports through to the sync generator. |
+| `cpc/GA40010/syncgen_sync.v` | Exposes/restores the GA interrupt scanline counter and IRQ-active flag used by SNA v3 savestates. |
+| `cpc/Amstrad_motherboard.v` | Wires PocketCPC SNA v3 CRTC/GA state between the wrapper and imported machine blocks. |
+
 ## Intentionally not imported as active machine files
 
 These MiSTer-side files remain references rather than active PocketCPC sources:

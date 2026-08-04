@@ -119,7 +119,7 @@ Logic that has state and changes in relation to clock edges. Counters, state mac
 
 ### `state machine`
 
-A common HDL pattern where a module tracks a current state and moves between named states over time. The ROM loader and FDC data-slot adapter in this repo are good examples.
+A common HDL pattern where a module tracks a current state and moves between named states over time. The FDC, tape, and SNA data-slot adapters in this repo are good examples.
 
 ### `synchronizer`
 
@@ -150,7 +150,9 @@ PocketCPC currently:
 It does not yet represent a fully finished CPC core. Important gaps still include:
 
 - disk writes are acknowledged but not persisted
-- Pocket savestates are not currently supported
+- Pocket savestates / Memories are supported experimentally through an
+  external-PSRAM staging path with an SNA v3-compatible payload; see
+  `docs/SAVESTATE_DEVLOG.md`
 - tape, snapshot-save plumbing, and some Dock keyboard mappings still need broader validation
 - the custom bridge register block is still minimal
 
@@ -224,7 +226,7 @@ Responsibilities:
 - synchronizes signals between clock domains
 - instantiates the CPC machine wrapper
 - adapts CPC video to Pocket scaler output timing
-- handles ROM loading through APF data slots
+- handles APF setup writes for `boot.rom` and `custom.rom`
 - handles disk block reads through APF data slots
 - maps Pocket inputs into the CPC input path
 
@@ -270,7 +272,7 @@ Use this order:
 5. `src/fpga/core/core_top.sv`
 6. `src/fpga/cpc/cpc_machine_pocket.sv`
 7. `src/fpga/cpc/cpc_ram_rom.sv`
-8. `src/fpga/core/pocket_dataslot_loader.sv`
+8. `src/fpga/core/pocket_apf_write_loader.sv`
 9. `src/fpga/core/pocket_fdc_dataslot.sv`
 10. `src/fpga/core/cpc_pocket_input.sv`
 11. `src/fpga/cpc/Amstrad_motherboard.v`
@@ -299,7 +301,7 @@ Important files:
 
 - `core_top.sv`: main integration top
 - `pocket_bridge_regs.sv`: simple custom register block
-- `pocket_dataslot_loader.sv`: ROM bundle loader
+- `pocket_apf_write_loader.sv`: APF setup write loader for ROM assets
 - `pocket_fdc_dataslot.sv`: disk block transport adapter
 - `cpc_pocket_input.sv`: Pocket input to CPC key events
 - `cpc_virtual_keyboard_overlay.sv`: on-screen keyboard overlay
@@ -328,6 +330,72 @@ Important files:
 - `input.json`: controller mapping metadata
 - `interact.json`: Pocket core-menu variables and actions
 - `video.json`: scaler metadata
+
+Current savestate debugging is exposed through `pocket_bridge_regs.sv` at:
+
+- `0x0044`: latched savestate result code in bits `[7:0]`, save-state phase in bits `[13:8]`
+- `0x0048`: load-state phase in bits `[5:0]` plus live word counters
+- `0x004C`: savestate flags such as `freeze_cpu`, header/version validity, byte-swap detection, safety gates, whether load waited for blob/runtime readiness, and load/save busy/ok/err latches
+- `0x0050`: last raw 32-bit load word seen by the CPC clock domain
+- `0x0054`: the same load word after byte-swap normalization
+- `0x0058`: count of host bridge writes seen in the savestate staging window, reset when the host starts writing a new blob at word address `0`
+- `0x005C`: last host-write trace, currently exposing the 16-bit savestate word address in bits `[31:16]` and the low 16 bits of the most recent host write data in bits `[15:0]`
+- `0x0060`: latched normalized header word `0` seen during savestate load
+- `0x0064`: latched normalized header word `1` seen during savestate load
+- `0x0068`: bridge-domain staging flags: the full most-recent bridge savestate word address in bits `[31:16]`, the low eight bits of the current export word address in bits `[15:8]`, the PSRAM client state in bits `[7:4]`, then `bridge_export_valid`, `bridge_read_active`, `bridge_export_ready`, and `load_busy_sync`
+- `0x006C`: CPC-domain readback of staged savestate word `0` after save completion
+- `0x0070`: CPC-domain readback of staged savestate word `1` after save completion
+- `0x0074`: bridge-domain primed export word `0` after save completion
+- `0x0078`: bridge-domain primed export word `1` after save completion
+
+When a savestate load fails or completes, `core_top.sv` also emits a target
+event burst into the Pocket device log. Failure bursts begin with `SSLE`;
+success bursts begin with `SSOK`. The current order is:
+
+1. marker (`SSLE` = `0x53534C45`, `SSOK` = `0x53534F4B`)
+2. staged save readback word `0`
+3. staged save readback word `1`
+4. staged save readback word `2`
+5. staged save readback word `3`
+6. bridge-primed export word `0`
+7. bridge-primed export word `1`
+8. savestate controller status word
+9. savestate controller progress word
+10. savestate controller flag word
+11. last raw load word
+12. last normalized load word
+13. loaded header word `0`
+14. loaded header word `1`
+15. bridge-domain staging flags
+16. top-level reset/menu/model flags, with CPU address in bits `[31:16]`
+17. live CPU `PC/SP` packed as `{PC, SP}`
+
+That ordering is designed to make the first 16 header bytes directly
+comparable with a known-good `.sna` fixture and to distinguish transport
+failures from post-apply reset/CPU-register failures.
+
+For that comparison, use:
+
+- [scripts/compare_sna_debug.py](/Users/steve/code/github.com/stilvoid/PocketCPC/scripts/compare_sna_debug.py)
+- [scripts/pocketcpc_savestate.py](/Users/steve/code/github.com/stilvoid/PocketCPC/scripts/pocketcpc_savestate.py)
+
+Example:
+
+```bash
+python3 scripts/compare_sna_debug.py \
+  --sna /Volumes/Pocket/Assets/amstrad/common/dizzy.sna \
+  --log /Volumes/Pocket/System/Logs/stilvoid.PocketCPC_20260727_162928.txt
+```
+
+The running design history, failed approaches, and current savestate direction
+are tracked in `docs/SAVESTATE_DEVLOG.md`.
+
+`pocketcpc_savestate.py` can generate the observed PocketCPC `.sta` wrapper
+metadata directly, including the generic Memory prefix and a blank thumbnail.
+Generated wrappers use the input `.sna` filename as their asset label unless
+`--asset-name` is provided. The script can also use `--template` to preserve the
+wrapper, label metadata, and thumbnail from an existing PocketCPC Memory while
+replacing only the embedded core payload.
 
 `make build` stages the finished installable package under:
 
@@ -373,20 +441,22 @@ core, `core_top.sv` synchronizes that notification into the CPC clock domain
 and pauses the CPC-side enable pulses while the Pocket menu is open, then
 resumes normal stepping when the menu closes.
 
-### Step 5: The ROM bundle loads through data slot `0x200`
+### Step 5: The ROM bundle loads through APF setup writes
 
-`pocket_dataslot_loader.sv` requests data slot `0x200`, which is described in
-`src/pocket/Cores/stilvoid.PocketCPC/data.json` as the required `boot.rom`
-slot.
+`src/pocket/Cores/stilvoid.PocketCPC/data.json` describes the required
+`boot.rom` slot as APF data slot `0x200`, mapped to bridge address
+`0x60000000`. It also describes the optional `custom.rom` slot as data slot
+`0x208`, mapped to bridge address `0x60028000`.
 
 The host-side flow is:
 
-1. the loader requests a chunk from the host through `core_bridge_cmd.v`
-2. the Pocket host writes the returned chunk into bridge RAM at `0x60000000`
-3. the loader reads that bridge RAM from the CPC clock domain
+1. APF loads the normal, non-deferred ROM data slots during core setup
+2. the Pocket host writes those slots directly to their configured bridge addresses
+3. `pocket_apf_write_loader.sv` accepts those bridge writes through a small CDC FIFO
 4. the loader streams bytes into `cpc_ram_rom.sv`
 
-The loader currently expects `0x28000` bytes, or 160 KiB total.
+The required ROM bundle is `0x28000` bytes, or 160 KiB total. If the optional
+custom ROM is present, another `0x4000` bytes are written at offset `0x28000`.
 
 That is the same ten-bank MiSTer-style ROM bundle layout used by
 `cpc_ram_rom.sv`:
@@ -704,7 +774,8 @@ This is Analogue's command handler. It is mapped to bridge addresses under `0xF8
 In this project it mainly serves as:
 
 - the framework-facing reset/status block
-- the data-slot command interface used by the ROM loader and FDC adapter
+- the data-slot command interface used by runtime media adapters
+- the setup data-slot write notifications used by the ROM loader
 - the source of `dataslot_update` notifications when media is mounted
 - the source of the Pocket menu-state notification used to pause the CPC while
   the menu is open
@@ -733,7 +804,7 @@ Check:
 
 - `ap_core.qsf` includes the right source files
 - `core_top.sv` reset and PLL-lock sequencing
-- `pocket_dataslot_loader.sv` state machine
+- `pocket_apf_write_loader.sv` bridge-write FIFO path
 - `cpc_ram_rom.sv` `rom_loaded`
 
 ### If the ROM loads but the machine does not execute correctly
@@ -783,11 +854,29 @@ That file lists the active HDL sources and project assignments for the Pocket bu
 From the repository root:
 
 ```bash
+make validate
 make build
 make report
 make install
 make dist
 ```
+
+### What `make validate` does
+
+It syncs `src/fpga/` into `build/quartus/` and runs Quartus Analysis &
+Elaboration in Docker using the same `raetro/quartus:18.1` image as the full
+build flow.
+
+Use it as the quick structural check after HDL edits. It catches:
+
+- syntax errors in Verilog, SystemVerilog, and VHDL sources
+- missing or mislisted source files in the Quartus project
+- hierarchy/elaboration failures
+- assignment and generated-file issues that show up before fit
+
+It does not run fitter, timing analysis, assembler, or package generation, so
+it is much cheaper than `make build` and suitable as the default agent-side
+validation step before handing a change back for human-run full compile.
 
 ### What `make build` does
 
@@ -885,7 +974,7 @@ That models state updates happening together at the clock edge. If you come from
 
 ### State machines are common
 
-`pocket_dataslot_loader.sv` and `pocket_fdc_dataslot.sv` are classic finite-state machines. That is one of the most common HDL patterns:
+`pocket_fdc_dataslot.sv` and the SNA/tape data-slot adapters are classic finite-state machines. That is one of the most common HDL patterns:
 
 - keep a `state` register
 - move between named states on each clock edge
@@ -899,7 +988,7 @@ If a module feels procedural, it is often best understood as a state machine.
 
 - `apf_top.v`
 - `core_top.sv`
-- `pocket_dataslot_loader.sv`
+- `pocket_apf_write_loader.sv`
 - `pocket_fdc_dataslot.sv`
 - `pocket_bridge_regs.sv`
 - metadata JSON files under `Cores/` and `Platforms/`
@@ -931,7 +1020,7 @@ If you want to keep learning by reading code, these are the best next targets.
 ### For APF/Pocket integration
 
 - `src/fpga/core/core_top.sv`
-- `src/fpga/core/pocket_dataslot_loader.sv`
+- `src/fpga/core/pocket_apf_write_loader.sv`
 - `src/fpga/core/pocket_fdc_dataslot.sv`
 - `src/fpga/core/core_bridge_cmd.v`
 

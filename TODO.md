@@ -38,12 +38,33 @@ release candidate.
 6. Add an adapter-layer test harness
    - Cover the local APF bridge, data-slot, and input translation modules.
    - Use it to catch integration regressions before Pocket hardware testing.
+   - A first savestate-specific comparison harness now exists via
+     `scripts/compare_sna_debug.py`; extend that into broader adapter coverage
+     instead of starting from scratch.
 
 ## Larger Features
 
 7. Pocket save state support
-   - Likely requires full machine-state serialization and restore, including
-     CPC core state, RAM, FDC state, tape runtime state, and wrapper state.
+   - Keep the full Pocket-visible savestate blob staged in external PSRAM, not
+     in Cyclone V BRAM and not as a live-streaming path.
+   - Expand hardware validation of the PSRAM-backed path beyond the proven
+     safe save/load/restart and basic sleep/wake cycles, especially FDC
+     in-flight state, tape runtime position, and any remaining adapter-local
+     state that should survive restore.
+   - SNA v3 CRTC/GA timing state stabilized the tested sleep/wake display and
+     CPC runtime state. If further edge cases appear, inspect remaining unsaved
+     runtime state such as PSG internal counters and wrapper-local
+     audio/interrupt latches before inventing another payload.
+   - APF-native ROM setup loading now gives a visible Pocket progress bar and
+     substantially improves tested wake latency. Keep `boot.rom` and
+     `custom.rom` on the normal APF setup-write path unless hardware evidence
+     proves a new need to change it.
+   - Investigate whether Pocket-created Memory labels can ever reflect the
+     last runtime-loaded `.sna`, `.dsk`, or `.cdt` media instead of the fixed
+     `boot.rom` asset. If APF exposes no supported runtime content-title path,
+     keep this documented as a Pocket UI limitation.
+   - Maintain `docs/SAVESTATE_DEVLOG.md` as experiments confirm or eliminate
+     design directions.
 
 8. Expansion ROM support
    - An experimental first step now exists: optional `custom.rom` mapped to

@@ -33,13 +33,21 @@ module syncgen_sync (
 	input  HSYNC_I,
 	input  VSYNC_I,
 	input  irq_reset,
+	input  SNA_LOAD,
+	input        SNA_GA_V3_VALID,
+	input  [7:0] SNA_GA_VSYNC_DELAY,
+	input  [7:0] SNA_GA_INT_SCANLINE,
+	input        SNA_GA_IRQ_ACTIVE,
 
 	output HSYNC_O,
 	output VSYNC_O,
 	output SYNC_N,
 	output reg INT_N,
 	output HCNTLT28,
-	output reg mode_sync_en
+	output reg mode_sync_en,
+	output [7:0] STATE_GA_VSYNC_DELAY,
+	output [7:0] STATE_GA_INT_SCANLINE,
+	output       STATE_GA_IRQ_ACTIVE
 );
 
 ///// SYNC AND IRQ GEN /////
@@ -59,10 +67,31 @@ reg        hsync_n_d;
 reg        vsync_o_d; // u812
 wire       irqack_rst;
 
+wire [4:0] sna_hcnt_reg =
+	(SNA_GA_VSYNC_DELAY == 8'd1) ? 5'h01 :
+	(SNA_GA_VSYNC_DELAY == 8'd2) ? 5'h06 :
+	                               5'h00;
+wire [4:0] sna_hcnt_next =
+	(SNA_GA_VSYNC_DELAY == 8'd1) ? 5'h06 :
+	(SNA_GA_VSYNC_DELAY == 8'd2) ? 5'h07 :
+	                               5'h01;
+
+// SNA v3 stores only the two pending GA VSYNC-delay phases. Map those back to
+// the local hsync-state sequence so save paths can preserve the same phase.
+assign STATE_GA_VSYNC_DELAY =
+	(hcnt_reg == 5'h01) ? 8'd1 :
+	(hcnt_reg == 5'h06) ? 8'd2 :
+	                      8'd0;
+assign STATE_GA_INT_SCANLINE = {2'd0, intcnt_reg};
+assign STATE_GA_IRQ_ACTIVE = ~INT_N;
+
 // edge detectors
 always @(posedge clk) begin
 	hsync_n_d <= hsync_n;
-	if (CCLK_EN_N) begin
+	if (SNA_LOAD) begin
+		vsync_d <= 1'b0;
+		vsync_o_d <= 1'b0;
+	end else if (CCLK_EN_N) begin
 		vsync_d <= VSYNC_I;
 		vsync_o_d <= VSYNC_O;
 	end
@@ -86,37 +115,42 @@ always @(*) begin
 end
 
 always @(posedge clk) begin
-	hcnt_reg <= hcnt;
-	case (hcnt)
-	5'h00: hcnt_next <= 5'h01;
-	5'h01: hcnt_next <= 5'h06;
-	5'h06: hcnt_next <= 5'h07;
-	5'h07: hcnt_next <= 5'h04;
-	5'h04: hcnt_next <= 5'h05;
-	5'h05: hcnt_next <= 5'h0A;
-	5'h0A: hcnt_next <= 5'h0B;
-	5'h0B: hcnt_next <= 5'h08;
-	5'h08: hcnt_next <= 5'h09;
-	5'h09: hcnt_next <= 5'h0E;
-	5'h0E: hcnt_next <= 5'h0F;
-	5'h0F: hcnt_next <= 5'h0C;
-	5'h0C: hcnt_next <= 5'h0D;
-	5'h0D: hcnt_next <= 5'h12;
-	5'h12: hcnt_next <= 5'h13;
-	5'h13: hcnt_next <= 5'h10;
-	5'h10: hcnt_next <= 5'h11;
-	5'h11: hcnt_next <= 5'h16;
-	5'h16: hcnt_next <= 5'h17;
-	5'h17: hcnt_next <= 5'h14;
-	5'h14: hcnt_next <= 5'h15;
-	5'h15: hcnt_next <= 5'h1A;
-	5'h1A: hcnt_next <= 5'h1B;
-	5'h1B: hcnt_next <= 5'h18;
-	5'h18: hcnt_next <= 5'h19;
-	5'h19: hcnt_next <= 5'h1E;
-	default: ;
-	endcase
-	//hcnt_next <= hcnt + 1'd1;
+	if (SNA_LOAD) begin
+		hcnt_reg  <= SNA_GA_V3_VALID ? sna_hcnt_reg : 5'h00;
+		hcnt_next <= SNA_GA_V3_VALID ? sna_hcnt_next : 5'h01;
+	end else begin
+		hcnt_reg <= hcnt;
+		case (hcnt)
+		5'h00: hcnt_next <= 5'h01;
+		5'h01: hcnt_next <= 5'h06;
+		5'h06: hcnt_next <= 5'h07;
+		5'h07: hcnt_next <= 5'h04;
+		5'h04: hcnt_next <= 5'h05;
+		5'h05: hcnt_next <= 5'h0A;
+		5'h0A: hcnt_next <= 5'h0B;
+		5'h0B: hcnt_next <= 5'h08;
+		5'h08: hcnt_next <= 5'h09;
+		5'h09: hcnt_next <= 5'h0E;
+		5'h0E: hcnt_next <= 5'h0F;
+		5'h0F: hcnt_next <= 5'h0C;
+		5'h0C: hcnt_next <= 5'h0D;
+		5'h0D: hcnt_next <= 5'h12;
+		5'h12: hcnt_next <= 5'h13;
+		5'h13: hcnt_next <= 5'h10;
+		5'h10: hcnt_next <= 5'h11;
+		5'h11: hcnt_next <= 5'h16;
+		5'h16: hcnt_next <= 5'h17;
+		5'h17: hcnt_next <= 5'h14;
+		5'h14: hcnt_next <= 5'h15;
+		5'h15: hcnt_next <= 5'h1A;
+		5'h1A: hcnt_next <= 5'h1B;
+		5'h1B: hcnt_next <= 5'h18;
+		5'h18: hcnt_next <= 5'h19;
+		5'h19: hcnt_next <= 5'h1E;
+		default: ;
+		endcase
+		//hcnt_next <= hcnt + 1'd1;
+	end
 end
 
 // hsync gen
@@ -174,8 +208,13 @@ always @(*) begin
 end
 
 always @(posedge clk) begin
-	intcnt_reg <= intcnt;
-	intcnt_next <= intcnt + 1'd1;
+	if (SNA_LOAD) begin
+		intcnt_reg  <= SNA_GA_V3_VALID ? SNA_GA_INT_SCANLINE[5:0] : 6'd0;
+		intcnt_next <= SNA_GA_V3_VALID ? (SNA_GA_INT_SCANLINE[5:0] + 1'd1) : 6'd1;
+	end else begin
+		intcnt_reg <= intcnt;
+		intcnt_next <= intcnt + 1'd1;
+	end
 end
 
 // interrupt ack/reset
@@ -186,7 +225,8 @@ always @(posedge clk)  begin
 	reg cnt5;
 	cnt5 <= intcnt[5];
 	// instead of async tricks, register INT_N in the main clk domain
-	if (int_reset) INT_N <= 1; else if (~intcnt[5] & cnt5) INT_N <= 0; // u836
+	if (SNA_LOAD) INT_N <= SNA_GA_V3_VALID ? ~SNA_GA_IRQ_ACTIVE : 1'b1;
+	else if (int_reset) INT_N <= 1; else if (~intcnt[5] & cnt5) INT_N <= 0; // u836
 end
 
 endmodule

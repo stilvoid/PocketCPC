@@ -35,6 +35,8 @@ module UM6845R
 	input            SNA_LOAD,
 	input      [4:0] SNA_ADDR,
 	input    [143:0] SNA_REGS,
+	input            SNA_CRTC_V3_VALID,
+	input     [63:0] SNA_CRTC_V3,
 	
 	output reg       VSYNC,
 	output reg       HSYNC,
@@ -45,7 +47,8 @@ module UM6845R
 	output    [13:0] MA,
 	output     [4:0] RA,
 	output     [4:0] STATE_ADDR,
-	output   [143:0] STATE_REGS
+	output   [143:0] STATE_REGS,
+	output    [63:0] STATE_CRTC_V3
 );
 
 /* verilator lint_off WIDTH */
@@ -96,6 +99,17 @@ reg [5:0] R14_cursor_h;
 reg [7:0] R15_cursor_l;
 
 reg [4:0] addr;
+
+wire [7:0] SNA_R0_h_total = SNA_REGS[0 +: 8];
+wire [7:0] SNA_R1_h_displayed = SNA_REGS[8 +: 8];
+wire [6:0] SNA_R4_v_total = SNA_REGS[32 +: 7];
+wire [4:0] SNA_R5_v_total_adj = SNA_REGS[40 +: 5];
+wire [6:0] SNA_R6_v_displayed = SNA_REGS[48 +: 7];
+wire [1:0] SNA_R8_interlace = SNA_REGS[65:64];
+wire [4:0] SNA_R9_v_max_line = SNA_REGS[72 +: 5];
+wire [5:0] SNA_R12_start_addr_h = SNA_REGS[96 +: 6];
+wire [7:0] SNA_R13_start_addr_l = SNA_REGS[104 +: 8];
+
 always @(*) begin
 	DO = 8'hFF;
 	if (ENABLE & ~nCS) begin
@@ -164,6 +178,27 @@ end
 
 wire [4:0] interlace = &R8_interlace[1:0];
 
+wire       sna_v3_in_adj = SNA_CRTC_V3[55];
+wire [7:0] sna_v3_hcc = SNA_CRTC_V3[7:0];
+wire [6:0] sna_v3_row = SNA_CRTC_V3[14:8];
+wire [4:0] sna_v3_raster_line = SNA_CRTC_V3[20:16];
+wire [4:0] sna_v3_adjust_line = SNA_CRTC_V3[28:24];
+wire [4:0] sna_v3_line = sna_v3_in_adj ? sna_v3_adjust_line : sna_v3_raster_line;
+wire [4:0] sna_v3_interlace = &SNA_R8_interlace[1:0];
+wire [4:0] sna_v3_line_max =
+	(sna_v3_in_adj ?
+		(|SNA_R5_v_total_adj ? (SNA_R5_v_total_adj - 1'd1) : 5'd0) :
+		SNA_R9_v_max_line) & ~sna_v3_interlace;
+wire       sna_v3_line_last = (sna_v3_line == sna_v3_line_max) || !sna_v3_line_max;
+wire       sna_v3_row_last = (sna_v3_row == SNA_R4_v_total) || (!CRTC_TYPE && !SNA_R4_v_total);
+wire [14:0] sna_v3_row_offset = SNA_R1_h_displayed * sna_v3_row;
+wire [13:0] sna_v3_row_base = {SNA_R12_start_addr_h, SNA_R13_start_addr_l} + sna_v3_row_offset[13:0];
+wire [13:0] sna_v3_row_next = sna_v3_row_base + {6'd0, SNA_R1_h_displayed};
+wire [13:0] sna_v3_current_addr = sna_v3_row_base + {6'd0, sna_v3_hcc};
+wire [13:0] sna_v3_saved_addr =
+	(sna_v3_line_last && (sna_v3_hcc >= SNA_R1_h_displayed)) ?
+	sna_v3_row_next : sna_v3_row_base;
+
 reg        in_adj;
 
 reg  [7:0] hcc;
@@ -190,6 +225,26 @@ wire       frame_adj_CRTC1 = row_last && ~in_adj && R5_v_total_adj;
 wire       frame_adj = CRTC_TYPE ? frame_adj_CRTC1 : frame_adj_CRTC0;
 wire       frame_new = row_new & row_frame_last;
 
+reg  [3:0] vsc;
+reg        vsync_allow;
+reg        hde;
+reg  [3:0] hsc;
+reg        vde, vde_r;
+reg        VSYNC_r;
+
+wire [4:0] crtc_vta_counter = in_adj ? line : 5'd0;
+wire [7:0] crtc_flags = {in_adj, 5'd0, HSYNC, VSYNC_r};
+assign STATE_CRTC_V3 = {
+	8'd0,
+	crtc_flags,
+	{4'd0, vsc},
+	{4'd0, hsc},
+	{3'd0, crtc_vta_counter},
+	{3'd0, line},
+	{1'd0, row},
+	hcc
+};
+
 // counters
 reg  field;
 always @(posedge CLOCK) begin
@@ -199,6 +254,16 @@ always @(posedge CLOCK) begin
 		row    <= 0;
 		in_adj <= 0;
 		field  <= 0;
+	end
+	else if(SNA_LOAD && SNA_CRTC_V3_VALID) begin
+		hcc          <= sna_v3_hcc;
+		line         <= sna_v3_line;
+		row          <= sna_v3_row;
+		in_adj       <= sna_v3_in_adj;
+		field        <= 0;
+		line_last_r  <= sna_v3_line_last;
+		row_last_r   <= sna_v3_row_last;
+		frame_adj_r  <= sna_v3_in_adj;
 	end
 	else if(CLKEN) begin
 		hcc <= hcc_next;
@@ -232,7 +297,11 @@ wire row_addr_save = hcc == R1_h_displayed && (CRTC_TYPE ? line_last : line_last
 reg  [13:0] row_addr;   // saved pointer
 reg  [13:0] row_addr_r; // current pointer
 always @(posedge CLOCK) begin
-	if(CLKEN) begin
+	if(SNA_LOAD && SNA_CRTC_V3_VALID) begin
+		row_addr   <= sna_v3_saved_addr;
+		row_addr_r <= sna_v3_current_addr;
+	end
+	else if(CLKEN) begin
 		if(row_addr_save) row_addr <= row_addr_r; // save current pointer
 
 		if(hcc_last & !row_addr_save) row_addr_r <= row_addr; // restore the pointer, take care of simultaneous saving and restoring
@@ -249,9 +318,6 @@ always @(posedge CLOCK) begin
 end
 
 // horizontal output
-reg        hde;
-reg  [3:0] hsc;
-
 wire hsync_on = hcc == R2_h_sync_pos && R3_h_sync_width != 0;
 wire hsync_off = (hsc == R3_h_sync_width) || (CRTC_TYPE && R3_h_sync_width == 0);
 
@@ -261,6 +327,11 @@ always @(posedge CLOCK) begin
 		hsc    <= 0;
 		hde    <= 0;
 		HSYNC  <= 0;
+	end
+	else if(SNA_LOAD && SNA_CRTC_V3_VALID) begin
+		hsc    <= SNA_CRTC_V3[35:32];
+		hde    <= (sna_v3_hcc < SNA_R1_h_displayed);
+		HSYNC  <= SNA_CRTC_V3[49];
 	end
 	else begin
 		// should be a half char delay (other edge of the clock?)
@@ -280,19 +351,21 @@ always @(posedge CLOCK) begin
 end
 
 // vertical output
-reg vde, vde_r;
-reg VSYNC_r;
 always @(posedge CLOCK) VSYNC <= VSYNC_r; // delay the same as HSYNC to not confuse the GA
 always @(posedge CLOCK) begin
-	reg  [3:0] vsc;
-	reg        vsync_allow;
-
 	if(~nRESET) begin
 		vsc    <= 0;
 		vde    <= 0;
 		vde_r  <= 0;
 		VSYNC_r<= 0;
 		vsync_allow <= 1;
+	end
+	else if(SNA_LOAD && SNA_CRTC_V3_VALID) begin
+		vsc    <= SNA_CRTC_V3[43:40];
+		vde    <= (sna_v3_row < SNA_R6_v_displayed);
+		vde_r  <= (sna_v3_row < SNA_R6_v_displayed);
+		VSYNC_r<= SNA_CRTC_V3[48];
+		vsync_allow <= !SNA_CRTC_V3[48];
 	end
 	else if (CLKEN) begin
 		if (!CRTC_TYPE && row == 0 && line == 0 && R6_v_displayed == 0) begin

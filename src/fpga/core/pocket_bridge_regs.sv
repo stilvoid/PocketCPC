@@ -27,6 +27,20 @@ module pocket_bridge_regs (
     output reg  [31:0] loader_addr,
     output reg  [31:0] loader_data,
     output reg  [31:0] loader_command,
+    input  wire [31:0] savestate_debug_status,
+    input  wire [31:0] savestate_debug_progress,
+    input  wire [31:0] savestate_debug_addresses,
+    input  wire [31:0] savestate_debug_bridge_flags,
+    input  wire [31:0] savestate_debug_last_load_word_raw,
+    input  wire [31:0] savestate_debug_last_load_word_norm,
+    input  wire [31:0] savestate_debug_load_header_word0,
+    input  wire [31:0] savestate_debug_load_header_word1,
+    input  wire [31:0] savestate_debug_save_readback_word0,
+    input  wire [31:0] savestate_debug_save_readback_word1,
+    input  wire [31:0] savestate_debug_bridge_prime_word0,
+    input  wire [31:0] savestate_debug_bridge_prime_word1,
+    input  wire [31:0] savestate_debug_bridge_host_write_count,
+    input  wire [31:0] savestate_debug_bridge_last_host_write,
     output reg         restart_request_toggle,
     output reg         snapshot_save_request_toggle,
     output wire [31:0] status
@@ -102,6 +116,20 @@ always @(posedge clk or negedge reset_n) begin
                 16'h0038: bridge_rd_data <= 32'h0000_0000;
                 16'h003c: bridge_rd_data <= 32'h0000_0000;
                 16'h0040: bridge_rd_data <= cont1_key;
+                16'h0044: bridge_rd_data <= savestate_debug_status;
+                16'h0048: bridge_rd_data <= savestate_debug_progress;
+                16'h004c: bridge_rd_data <= savestate_debug_addresses;
+                16'h0050: bridge_rd_data <= savestate_debug_last_load_word_raw;
+                16'h0054: bridge_rd_data <= savestate_debug_last_load_word_norm;
+                16'h0058: bridge_rd_data <= savestate_debug_bridge_host_write_count;
+                16'h005c: bridge_rd_data <= savestate_debug_bridge_last_host_write;
+                16'h0060: bridge_rd_data <= savestate_debug_load_header_word0;
+                16'h0064: bridge_rd_data <= savestate_debug_load_header_word1;
+                16'h0068: bridge_rd_data <= savestate_debug_bridge_flags;
+                16'h006c: bridge_rd_data <= savestate_debug_save_readback_word0;
+                16'h0070: bridge_rd_data <= savestate_debug_save_readback_word1;
+                16'h0074: bridge_rd_data <= savestate_debug_bridge_prime_word0;
+                16'h0078: bridge_rd_data <= savestate_debug_bridge_prime_word1;
                 default:  bridge_rd_data <= 32'h0000_0000;
             endcase
         end

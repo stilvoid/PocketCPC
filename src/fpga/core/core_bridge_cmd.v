@@ -78,6 +78,7 @@ input   wire            savestate_load_ack,
 input   wire            savestate_load_busy,
 input   wire            savestate_load_ok,
 input   wire            savestate_load_err,
+input   wire    [15:0]  savestate_load_progress,
 
 input   wire            target_dataslot_read_s,       // rising edge triggered
 input   wire            target_dataslot_read_48_s,       // rising edge triggered
@@ -85,6 +86,8 @@ input   wire            target_dataslot_write_s,
 input   wire            target_dataslot_write_48_s,
 input   wire            target_dataslot_getfile_s,
 input   wire            target_dataslot_openfile_s,
+input   wire            target_debug_event_s,
+input   wire    [31:0]  target_debug_event_data_s,
 
 output  reg             target_dataslot_ack,        // asserted upon command start until completion
 output  reg             target_dataslot_ack_s,        // asserted upon command start until completion
@@ -165,10 +168,13 @@ end
     reg     [15:0]  host_cmd_startval;
     reg     [15:0]  host_cmd;
     reg     [15:0]  host_resultcode;
+    reg     [3:0]   savestate_load_result_delay;
     
 localparam  [3:0]   ST_IDLE         = 'd0;
 localparam  [3:0]   ST_PARSE        = 'd1;
 localparam  [3:0]   ST_WORK         = 'd2;
+localparam  [3:0]   ST_SAVESTATE_LOAD_WAIT_ACK  = 'd3;
+localparam  [3:0]   ST_SAVESTATE_LOAD_WAIT_DONE = 'd4;
 localparam  [3:0]   ST_DONE_OK      = 'd13;
 localparam  [3:0]   ST_DONE_CODE    = 'd14;
 localparam  [3:0]   ST_DONE_ERR     = 'd15;
@@ -188,8 +194,10 @@ localparam  [3:0]   ST_DONE_ERR     = 'd15;
 localparam  [3:0]   TARG_ST_IDLE        = 'd0;
 localparam  [3:0]   TARG_ST_READYTORUN  = 'd1;
 localparam  [3:0]   TARG_ST_DATASLOTOP  = 'd2;
+localparam  [3:0]   TARG_ST_DEBUGEVENT  = 'd3;
 localparam  [3:0]   TARG_ST_WAITRESULT_RTR  = 'd14;
 localparam  [3:0]   TARG_ST_WAITRESULT_DSO  = 'd15;
+localparam  [3:0]   TARG_ST_WAITRESULT_DBG  = 'd13;
     reg     [3:0]   tstate;
 	    reg     [3:0]   debug_tstate_r;
 	    reg     [3:0]   debug_target_io_r;
@@ -214,6 +222,7 @@ initial begin
     rtc_valid <= 0;
     savestate_start <= 0;
     savestate_load <= 0;
+    savestate_load_result_delay <= 0;
     osnotify_inmenu <= 0;
     osnotify_display_mode <= 0;
     
@@ -514,12 +523,10 @@ always @(posedge clk) begin
             if(savestate_load_err) host_resultcode <= 3;
             
             if(host_20[0]) begin
-                // Request Load!
-                savestate_load <= 1;
-                // stay in this state until ack'd
-                if(savestate_load_ack) begin
-                    hstate <= ST_DONE_CODE;
-                end
+                // Request Load!  Keep the host command in APF busy state until
+                // the restore is complete so Pocket can render command progress.
+                savestate_load_result_delay <= 4'd8;
+                hstate <= ST_SAVESTATE_LOAD_WAIT_ACK;
             end else begin
                 hstate <= ST_DONE_CODE;
             end
@@ -541,6 +548,31 @@ always @(posedge clk) begin
             hstate <= ST_DONE_OK;
         end
         endcase
+    end
+    ST_SAVESTATE_LOAD_WAIT_ACK: begin
+        host_0 <= {16'h4255, savestate_load_progress};
+        savestate_load <= 1;
+        if(savestate_load_ack) begin
+            savestate_load <= 0;
+            hstate <= ST_SAVESTATE_LOAD_WAIT_DONE;
+        end
+    end
+    ST_SAVESTATE_LOAD_WAIT_DONE: begin
+        host_0 <= {16'h4255, savestate_load_progress};
+        host_40 <= savestate_supported;
+        host_44 <= savestate_addr;
+        host_48 <= savestate_maxloadsize;
+        host_4C <= 32'd0;
+        host_resultcode <= 1;
+        if(savestate_load_result_delay != 4'd0) begin
+            savestate_load_result_delay <= savestate_load_result_delay - 4'd1;
+        end else if(savestate_load_ok) begin
+            host_resultcode <= 2;
+            hstate <= ST_DONE_CODE;
+        end else if(savestate_load_err) begin
+            host_resultcode <= 3;
+            hstate <= ST_DONE_CODE;
+        end
     end
     ST_WORK: begin
         hstate <= ST_IDLE;
@@ -632,6 +664,10 @@ always @(posedge clk) begin
             target_24 <= target_buffer_param_struct; // pointer to the bram that will hold the parameter struct
                                                     // which must contain the desired filename and flag/size before command execution
             tstate <= TARG_ST_DATASLOTOP;
+        end else if(target_debug_event_s) begin
+            target_0[15:0] <= 16'h0152;
+            target_20 <= target_debug_event_data_s;
+            tstate <= TARG_ST_DEBUGEVENT;
         end 
     end
     TARG_ST_READYTORUN: begin
@@ -647,6 +683,11 @@ always @(posedge clk) begin
         target_dataslot_err <= 0;
         tstate <= TARG_ST_WAITRESULT_DSO;
     end
+    TARG_ST_DEBUGEVENT: begin
+        debug_tstate_r <= TARG_ST_DEBUGEVENT;
+        target_0[31:16] <= 16'h636D;
+        tstate <= TARG_ST_WAITRESULT_DBG;
+    end
     TARG_ST_WAITRESULT_DSO: begin
         debug_tstate_r <= TARG_ST_WAITRESULT_DSO;
         if(target_0[31:16] == 16'h6275) begin
@@ -658,6 +699,12 @@ always @(posedge clk) begin
             target_dataslot_err <= target_0[2:0];
             // assert done
             target_dataslot_done <= 1;
+            tstate <= TARG_ST_IDLE;
+        end
+    end
+    TARG_ST_WAITRESULT_DBG: begin
+        debug_tstate_r <= TARG_ST_WAITRESULT_DBG;
+        if(target_0[31:16] == 16'h6F6B) begin
             tstate <= TARG_ST_IDLE;
         end
     end

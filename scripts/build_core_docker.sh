@@ -36,7 +36,7 @@ PREBUILD_GIT_STATE="unknown"
 
 usage() {
     cat <<EOF
-usage: $(basename "$0") [build|status|log|wait|stop|freshness|assert-fresh]
+usage: $(basename "$0") [build|validate|status|log|wait|stop|freshness|assert-fresh]
 EOF
 }
 
@@ -291,6 +291,61 @@ run_build() {
     } | tee -a "$LOG_FILE"
 }
 
+run_validate() {
+    local validate_status heartbeat_pid
+
+    mkdir -p "$STATE_DIR"
+
+    if container_running; then
+        echo "A Quartus validation is already running in container '$CONTAINER_NAME'." >&2
+        exit 1
+    fi
+
+    if container_exists; then
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    fi
+
+    : > "$LOG_FILE"
+    rm -f "$CID_FILE" "$LAST_EXIT_FILE" "$LAST_END_FILE"
+    now_utc > "$LAST_START_FILE"
+
+    {
+        echo "[validate] starting at $(cat "$LAST_START_FILE")"
+        echo "[validate] container=$CONTAINER_NAME image=$IMAGE"
+        artifact_summary
+    } | tee -a "$LOG_FILE"
+
+    heartbeat &
+    heartbeat_pid=$!
+
+    set +e
+    docker run --rm --name "$CONTAINER_NAME" --cidfile "$CID_FILE" --platform linux/amd64 \
+        --user "$(id -u):$(id -g)" \
+        -v "$FPGA_DIR:/work" \
+        -w /work \
+        "$IMAGE" \
+        /opt/intelFPGA/quartus/bin/quartus_map ap_core -c ap_core --analysis_and_elaboration --write_settings_files=off 2>&1 | tee -a "$LOG_FILE"
+    validate_status=${PIPESTATUS[0]}
+    set -e
+
+    kill "$heartbeat_pid" 2>/dev/null || true
+    wait "$heartbeat_pid" 2>/dev/null || true
+
+    rm -f "$CID_FILE"
+    printf '%s\n' "$validate_status" > "$LAST_EXIT_FILE"
+    now_utc > "$LAST_END_FILE"
+
+    if [ "$validate_status" -ne 0 ]; then
+        echo "[validate] Quartus exited with status $validate_status at $(cat "$LAST_END_FILE")" | tee -a "$LOG_FILE"
+        exit "$validate_status"
+    fi
+
+    {
+        echo "[validate] completed at $(cat "$LAST_END_FILE")"
+        artifact_summary
+    } | tee -a "$LOG_FILE"
+}
+
 show_status() {
     mkdir -p "$STATE_DIR"
 
@@ -368,6 +423,9 @@ cmd="${1:-build}"
 case "$cmd" in
     build)
         run_build
+        ;;
+    validate)
+        run_validate
         ;;
     status)
         show_status
