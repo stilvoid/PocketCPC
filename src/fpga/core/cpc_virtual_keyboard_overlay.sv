@@ -281,62 +281,43 @@ wire [9:0] glyph5_x = glyph_start_x + 10'd60;
 wire [9:0] glyph6_x = glyph_start_x + 10'd72;
 wire [9:0] glyph7_x = glyph_start_x + 10'd84;
 wire [5:0] glyph_y_off = local_y_ext - glyph_start_y;
-wire       glyph_region0 = (local_x_ext >= glyph0_x) && (local_x_ext < (glyph0_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire       glyph_region1 = (label_size > 4'd1) &&
-                           (local_x_ext >= glyph1_x) && (local_x_ext < (glyph1_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire       glyph_region2 = (label_size > 4'd2) &&
-                           (local_x_ext >= glyph2_x) && (local_x_ext < (glyph2_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire       glyph_region3 = (MAX_LABEL_GLYPHS > 4'd3) && (label_size > 4'd3) &&
-                           (local_x_ext >= glyph3_x) && (local_x_ext < (glyph3_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire       glyph_region4 = (MAX_LABEL_GLYPHS > 4'd4) && (label_size > 4'd4) &&
-                           (local_x_ext >= glyph4_x) && (local_x_ext < (glyph4_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire       glyph_region5 = (MAX_LABEL_GLYPHS > 4'd5) && (label_size > 4'd5) &&
-                           (local_x_ext >= glyph5_x) && (local_x_ext < (glyph5_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire       glyph_region6 = (MAX_LABEL_GLYPHS > 4'd6) && (label_size > 4'd6) &&
-                           (local_x_ext >= glyph6_x) && (local_x_ext < (glyph6_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire       glyph_region7 = (MAX_LABEL_GLYPHS > 4'd7) && (label_size > 4'd7) &&
-                           (local_x_ext >= glyph7_x) && (local_x_ext < (glyph7_x + 7'd10)) &&
-                           (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
-wire [9:0] glyph_dx0 = local_x_ext - glyph0_x;
-wire [9:0] glyph_dx1 = local_x_ext - glyph1_x;
-wire [9:0] glyph_dx2 = local_x_ext - glyph2_x;
-wire [9:0] glyph_dx3 = local_x_ext - glyph3_x;
-wire [9:0] glyph_dx4 = local_x_ext - glyph4_x;
-wire [9:0] glyph_dx5 = local_x_ext - glyph5_x;
-wire [9:0] glyph_dx6 = local_x_ext - glyph6_x;
-wire [9:0] glyph_dx7 = local_x_ext - glyph7_x;
-wire [2:0] glyph_col0 = glyph_dx0[3:1];
-wire [2:0] glyph_col1 = glyph_dx1[3:1];
-wire [2:0] glyph_col2 = glyph_dx2[3:1];
-wire [2:0] glyph_col3 = glyph_dx3[3:1];
-wire [2:0] glyph_col4 = glyph_dx4[3:1];
-wire [2:0] glyph_col5 = glyph_dx5[3:1];
-wire [2:0] glyph_col6 = glyph_dx6[3:1];
-wire [2:0] glyph_col7 = glyph_dx7[3:1];
 wire [2:0] glyph_row = glyph_y_off[3:1];
-wire [4:0] glyph_bits0 = glyph_row_bits(label_char0, glyph_row);
-wire [4:0] glyph_bits1 = glyph_row_bits(label_char1, glyph_row);
-wire [4:0] glyph_bits2 = glyph_row_bits(label_char2, glyph_row);
-wire [4:0] glyph_bits3 = glyph_row_bits(label_char3, glyph_row);
-wire [4:0] glyph_bits4 = glyph_row_bits(label_char4, glyph_row);
-wire [4:0] glyph_bits5 = glyph_row_bits(label_char5, glyph_row);
-wire [4:0] glyph_bits6 = glyph_row_bits(label_char6, glyph_row);
-wire [4:0] glyph_bits7 = glyph_row_bits(label_char7, glyph_row);
-wire       glyph_on = (glyph_region0 && glyph_bits0[3'd4 - glyph_col0]) ||
-                      (glyph_region1 && glyph_bits1[3'd4 - glyph_col1]) ||
-                      (glyph_region2 && glyph_bits2[3'd4 - glyph_col2]) ||
-                      (glyph_region3 && glyph_bits3[3'd4 - glyph_col3]) ||
-                      (glyph_region4 && glyph_bits4[3'd4 - glyph_col4]) ||
-                      (glyph_region5 && glyph_bits5[3'd4 - glyph_col5]) ||
-                      (glyph_region6 && glyph_bits6[3'd4 - glyph_col6]) ||
-                      (glyph_region7 && glyph_bits7[3'd4 - glyph_col7]);
+wire       glyph_y_region = (local_y_ext >= glyph_start_y) && (local_y_ext < (glyph_start_y + 6'd14));
+wire [9:0] glyph_dx = local_x_ext - glyph_start_x;
+
+function [3:0] glyph_slot_from_dx;
+    input [9:0] dx;
+    begin
+        if (dx < 10'd10) glyph_slot_from_dx = 4'd0;
+        else if (dx < 10'd22) glyph_slot_from_dx = 4'd1;
+        else if (dx < 10'd34) glyph_slot_from_dx = 4'd2;
+        else if (dx < 10'd46) glyph_slot_from_dx = 4'd3;
+        else if (dx < 10'd58) glyph_slot_from_dx = 4'd4;
+        else if (dx < 10'd70) glyph_slot_from_dx = 4'd5;
+        else if (dx < 10'd82) glyph_slot_from_dx = 4'd6;
+        else if (dx < 10'd94) glyph_slot_from_dx = 4'd7;
+        else glyph_slot_from_dx = 4'd15;
+    end
+endfunction
+
+function [2:0] glyph_col_from_dx;
+    input [9:0] dx;
+    reg   [9:0] slot_base;
+    reg   [9:0] glyph_col_dx;
+    begin
+        if (dx < 10'd10) slot_base = 10'd0;
+        else if (dx < 10'd22) slot_base = 10'd12;
+        else if (dx < 10'd34) slot_base = 10'd24;
+        else if (dx < 10'd46) slot_base = 10'd36;
+        else if (dx < 10'd58) slot_base = 10'd48;
+        else if (dx < 10'd70) slot_base = 10'd60;
+        else if (dx < 10'd82) slot_base = 10'd72;
+        else slot_base = 10'd84;
+        glyph_col_dx = dx - slot_base;
+        glyph_col_from_dx = glyph_col_dx[3:1];
+    end
+endfunction
+
 wire       modifier_latched = (shift_active && shift_cell) || (ctrl_active && ctrl_cell) ||
                               (caps_active && caps_cell);
 wire [6:0]  key_bound_mask = bound_mask_for_target(key_idx, page, bound_valid_mask, bound_index_bus, bound_page_bus);
@@ -721,6 +702,7 @@ wire [7:0] status_key_char2 = label_char(status_key_index, status_key_page, shif
 wire [5:0] status_chars = status_char_count(bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, selected_bound_mask);
 localparam [7:0] STATUS_TEXT_X0 = 8'd6;
 localparam [7:0] STATUS_TEXT_W = 8'd198;
+localparam [5:0] STATUS_TEXT_CACHE_CHARS = 6'd33;
 wire [8:0] status_text_x_full = band_x[9:1] - {1'b0, STATUS_TEXT_X0};
 wire [7:0] status_text_x = status_text_x_full[7:0];
 wire       status_text_active = status_row_active &&
@@ -729,17 +711,43 @@ wire       status_text_active = status_row_active &&
 wire [5:0] status_char_index = status_char_index_from_x(status_text_x);
 wire [7:0] status_glyph_col_full = status_glyph_col_from_x(status_text_x);
 wire [2:0] status_glyph_col = status_glyph_col_full[2:0];
-wire [7:0] status_char_code = status_char(
-    status_char_index,
-    bind_mode,
-    bind_feedback_active,
-    bind_feedback_button,
-    status_key_label_len,
-    status_key_char0,
-    status_key_char1,
-    status_key_char2,
-    selected_bound_mask
-);
+wire [7:0] status_text_chars [0:32];
+assign status_text_chars[0]  = status_char(6'd0,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[1]  = status_char(6'd1,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[2]  = status_char(6'd2,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[3]  = status_char(6'd3,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[4]  = status_char(6'd4,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[5]  = status_char(6'd5,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[6]  = status_char(6'd6,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[7]  = status_char(6'd7,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[8]  = status_char(6'd8,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[9]  = status_char(6'd9,  bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[10] = status_char(6'd10, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[11] = status_char(6'd11, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[12] = status_char(6'd12, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[13] = status_char(6'd13, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[14] = status_char(6'd14, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[15] = status_char(6'd15, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[16] = status_char(6'd16, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[17] = status_char(6'd17, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[18] = status_char(6'd18, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[19] = status_char(6'd19, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[20] = status_char(6'd20, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[21] = status_char(6'd21, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[22] = status_char(6'd22, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[23] = status_char(6'd23, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[24] = status_char(6'd24, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[25] = status_char(6'd25, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[26] = status_char(6'd26, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[27] = status_char(6'd27, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[28] = status_char(6'd28, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[29] = status_char(6'd29, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[30] = status_char(6'd30, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[31] = status_char(6'd31, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+assign status_text_chars[32] = status_char(6'd32, bind_mode, bind_feedback_active, bind_feedback_button, status_key_label_len, status_key_char0, status_key_char1, status_key_char2, selected_bound_mask);
+wire [7:0] status_char_code =
+    (status_char_index < STATUS_TEXT_CACHE_CHARS) ?
+        status_text_chars[status_char_index] : 8'h20;
 wire [4:0] status_glyph_bits = glyph_row_bits(status_char_code, status_glyph_row);
 wire       status_glyph_region = status_text_active &&
                                  (status_band_y >= 9'd1) && (status_band_y < 9'd15) &&
@@ -768,6 +776,51 @@ reg [23:0] key_fill_r = 24'h202020;
 reg [23:0] key_border_r = 24'h606060;
 reg [23:0] status_fill_r = 24'h402060;
 reg [23:0] status_border_color_r = 24'hb020ff;
+reg [23:0] rgb_in_s1 = 24'h000000;
+reg [23:0] rgb_in_r = 24'h000000;
+
+reg        in_band_s1 = 1'b0;
+reg        selected_s1 = 1'b0;
+reg        border_s1 = 1'b0;
+reg        bind_mode_s1 = 1'b0;
+reg        status_row_s1 = 1'b0;
+reg        status_glyph_on_s1 = 1'b0;
+reg        bind_feedback_active_s1 = 1'b0;
+reg        status_border_s1 = 1'b0;
+reg [23:0] key_fill_s1 = 24'h202020;
+reg [23:0] key_border_s1 = 24'h606060;
+reg [23:0] status_fill_s1 = 24'h402060;
+reg [23:0] status_border_color_s1 = 24'hb020ff;
+reg        glyph_y_region_s1 = 1'b0;
+reg [9:0]  glyph_dx_s1 = 10'd0;
+reg [2:0]  glyph_row_s1 = 3'd0;
+reg [3:0]  label_size_s1 = 4'd0;
+reg [7:0]  label_char0_s1 = 8'h20;
+reg [7:0]  label_char1_s1 = 8'h20;
+reg [7:0]  label_char2_s1 = 8'h20;
+reg [7:0]  label_char3_s1 = 8'h20;
+reg [7:0]  label_char4_s1 = 8'h20;
+reg [7:0]  label_char5_s1 = 8'h20;
+reg [7:0]  label_char6_s1 = 8'h20;
+reg [7:0]  label_char7_s1 = 8'h20;
+
+wire [3:0] glyph_slot_s1 = glyph_slot_from_dx(glyph_dx_s1);
+wire [2:0] glyph_col_s1 = glyph_col_from_dx(glyph_dx_s1);
+wire       glyph_slot_valid_s1 =
+    glyph_y_region_s1 &&
+    (glyph_slot_s1 < {1'b0, label_size_s1}) &&
+    (glyph_col_s1 < 3'd5);
+wire [7:0] glyph_char_s1 =
+    (glyph_slot_s1 == 4'd0) ? label_char0_s1 :
+    (glyph_slot_s1 == 4'd1) ? label_char1_s1 :
+    (glyph_slot_s1 == 4'd2) ? label_char2_s1 :
+    (glyph_slot_s1 == 4'd3) ? label_char3_s1 :
+    (glyph_slot_s1 == 4'd4) ? label_char4_s1 :
+    (glyph_slot_s1 == 4'd5) ? label_char5_s1 :
+    (glyph_slot_s1 == 4'd6) ? label_char6_s1 :
+                              label_char7_s1;
+wire [4:0] glyph_bits_s1 = glyph_row_bits(glyph_char_s1, glyph_row_s1);
+wire       glyph_on_s1 = glyph_slot_valid_s1 && glyph_bits_s1[3'd4 - glyph_col_s1];
 
 function key_is_alpha;
     input [6:0] key_index;
@@ -1299,6 +1352,32 @@ always @(posedge clk) begin
         key_border_r <= 24'h606060;
         status_fill_r <= 24'h402060;
         status_border_color_r <= 24'hb020ff;
+        rgb_in_s1    <= 24'h000000;
+        rgb_in_r     <= 24'h000000;
+        in_band_s1   <= 1'b0;
+        selected_s1  <= 1'b0;
+        border_s1    <= 1'b0;
+        bind_mode_s1 <= 1'b0;
+        status_row_s1 <= 1'b0;
+        status_glyph_on_s1 <= 1'b0;
+        bind_feedback_active_s1 <= 1'b0;
+        status_border_s1 <= 1'b0;
+        key_fill_s1  <= 24'h202020;
+        key_border_s1 <= 24'h606060;
+        status_fill_s1 <= 24'h402060;
+        status_border_color_s1 <= 24'hb020ff;
+        glyph_y_region_s1 <= 1'b0;
+        glyph_dx_s1  <= 10'd0;
+        glyph_row_s1 <= 3'd0;
+        label_size_s1 <= 4'd0;
+        label_char0_s1 <= 8'h20;
+        label_char1_s1 <= 8'h20;
+        label_char2_s1 <= 8'h20;
+        label_char3_s1 <= 8'h20;
+        label_char4_s1 <= 8'h20;
+        label_char5_s1 <= 8'h20;
+        label_char6_s1 <= 8'h20;
+        label_char7_s1 <= 8'h20;
         rgb_out      <= 24'h000000;
         overlay_on   <= 1'b0;
     end else if (ce) begin
@@ -1317,19 +1396,47 @@ always @(posedge clk) begin
         de_prev <= de;
         vs_prev <= vs;
 
-        in_band_r    <= in_band;
-        glyph_on_r   <= glyph_on;
-        selected_r   <= selected;
-        border_r     <= border;
-        bind_mode_r  <= bind_mode;
-        status_row_r <= status_row_active;
-        status_glyph_on_r <= status_glyph_on;
-        bind_feedback_active_r <= bind_feedback_active;
-        status_border_r <= status_border;
-        key_fill_r   <= key_fill;
-        key_border_r <= key_border;
-        status_fill_r <= status_fill;
-        status_border_color_r <= status_border_color;
+        rgb_in_s1 <= rgb_in;
+        rgb_in_r  <= rgb_in_s1;
+
+        in_band_s1   <= in_band;
+        selected_s1  <= selected;
+        border_s1    <= border;
+        bind_mode_s1 <= bind_mode;
+        status_row_s1 <= status_row_active;
+        status_glyph_on_s1 <= status_glyph_on;
+        bind_feedback_active_s1 <= bind_feedback_active;
+        status_border_s1 <= status_border;
+        key_fill_s1  <= key_fill;
+        key_border_s1 <= key_border;
+        status_fill_s1 <= status_fill;
+        status_border_color_s1 <= status_border_color;
+        glyph_y_region_s1 <= glyph_y_region;
+        glyph_dx_s1  <= glyph_dx;
+        glyph_row_s1 <= glyph_row;
+        label_size_s1 <= label_size;
+        label_char0_s1 <= label_char0;
+        label_char1_s1 <= label_char1;
+        label_char2_s1 <= label_char2;
+        label_char3_s1 <= label_char3;
+        label_char4_s1 <= label_char4;
+        label_char5_s1 <= label_char5;
+        label_char6_s1 <= label_char6;
+        label_char7_s1 <= label_char7;
+
+        in_band_r    <= in_band_s1;
+        glyph_on_r   <= glyph_on_s1;
+        selected_r   <= selected_s1;
+        border_r     <= border_s1;
+        bind_mode_r  <= bind_mode_s1;
+        status_row_r <= status_row_s1;
+        status_glyph_on_r <= status_glyph_on_s1;
+        bind_feedback_active_r <= bind_feedback_active_s1;
+        status_border_r <= status_border_s1;
+        key_fill_r   <= key_fill_s1;
+        key_border_r <= key_border_s1;
+        status_fill_r <= status_fill_s1;
+        status_border_color_r <= status_border_color_s1;
         overlay_on   <= in_band_r;
 
         if (in_band_r && status_row_r && status_glyph_on_r) rgb_out <= status_glyph_color;
@@ -1338,7 +1445,7 @@ always @(posedge clk) begin
         else if (in_band_r && glyph_on_r) rgb_out <= selected_r ? 24'h000000 : 24'hffffff;
         else if (in_band_r && border_r) rgb_out <= selected_r ? 24'hffffff : key_border_r;
         else if (in_band_r) rgb_out <= selected_r ? (bind_mode_r ? 24'h8fd8ff : (bind_feedback_active_r ? 24'h7ad6ff : 24'hffd000)) : key_fill_r;
-        else rgb_out <= rgb_in;
+        else rgb_out <= rgb_in_r;
     end
 end
 

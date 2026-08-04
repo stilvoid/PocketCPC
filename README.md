@@ -131,23 +131,25 @@ Normal play:
 
 - D-pad: joystick directions by default, or `Cursor Keys` / `QAOP` through `Core Settings` -> `D-pad Mode`
 - `A`: joystick fire 1
-- `B`: `Space`
-- `X`: `Return`
-- `Y`: `COPY`
+- `B`: joystick up
+- `X`: `Space`
+- `Y`: `Return`
 - `L`: `Shift`
 - `R`: `Ctrl`
 - `Select`: open virtual keyboard
 - `Start`: `Escape`
 
-Most CPC software expects a one-button joystick. The spare Pocket face buttons are therefore used for common CPC keys instead of extra joystick fire buttons.
+Most CPC software expects a one-button joystick. `B` therefore doubles as a
+second easy-reach joystick-up input for jump-heavy games, while the remaining
+spare Pocket face buttons stay available for common CPC keys.
 
 Virtual keyboard mode:
 
 - D-pad: move selection
 - `A`: press selected key
-- `B`: `Space`
-- `X`: `Return`
-- `Y`: `Delete`
+- `B`: `Delete`
+- `X`: `Space`
+- `Y`: `Return`
 - `L`: `Shift`
 - `R`: next VKB page
 - `Select`: close virtual keyboard, or cancel button-bind mode

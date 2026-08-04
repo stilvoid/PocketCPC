@@ -12,17 +12,17 @@
           },
           {
             "id": 5,
-            "name": "Space",
+            "name": "Joystick Up / Backspace",
             "key": "pad_btn_b"
           },
           {
             "id": 6,
-            "name": "Return",
+            "name": "Space",
             "key": "pad_btn_x"
           },
           {
             "id": 7,
-            "name": "COPY / Delete",
+            "name": "Return",
             "key": "pad_btn_y"
           },
           {

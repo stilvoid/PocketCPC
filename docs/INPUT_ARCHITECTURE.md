@@ -62,9 +62,9 @@ Current defaults are:
 
 - D-pad -> joystick by default
 - `A` -> joystick fire 1
-- `B` -> `Space`
-- `X` -> `Return`
-- `Y` -> `COPY`
+- `B` -> joystick up
+- `X` -> `Space`
+- `Y` -> `Return`
 - `L` -> `Shift`
 - `R` -> `Ctrl`
 - `Select` -> open VKB
@@ -73,8 +73,10 @@ Current defaults are:
 This is a deliberate CPC-specific compromise:
 
 - most CPC software effectively expects a one-button joystick
-- the spare face buttons are more useful as direct keyboard helpers than as
-  extra joystick fire buttons
+- `B` is more useful as an easy-reach secondary joystick-up input for
+  jump-heavy games than as a direct keyboard helper
+- the remaining spare face buttons are still more useful as direct keyboard
+  helpers than as extra joystick fire buttons
 
 ## D-pad modes
 

@@ -107,7 +107,7 @@ wire [6:0]  normal_joy1 = {
     1'b0, // fire 3 default comes only from explicit remap
     1'b0, // fire 2 default comes only from explicit remap
     !custom_button_valid[4] && buttons[4], // A -> fire 1 unless rebound
-    dpad_joystick_mode && buttons[0],
+    (dpad_joystick_mode && buttons[0]) || (!custom_button_valid[5] && buttons[5]),
     dpad_joystick_mode && buttons[1],
     dpad_joystick_mode && buttons[2],
     dpad_joystick_mode && buttons[3]
@@ -116,14 +116,14 @@ wire [6:0]  vkb_virtual_joy1 =
     (vkb_active && !macro_active && !vkb_bind_mode && buttons[4] && (vkb_selected_key_joy != 7'd0)) ?
         vkb_selected_key_joy : 7'd0;
 wire [6:0]  effective_bound_index_a = custom_button_valid[4]  ? custom_button_vkb_index[4]  : 7'd23;
-wire [6:0]  effective_bound_index_b = custom_button_valid[5]  ? custom_button_vkb_index[5]  : 7'd64;
-wire [6:0]  effective_bound_index_x = custom_button_valid[6]  ? custom_button_vkb_index[6]  : 7'd28;
-wire [6:0]  effective_bound_index_y = custom_button_valid[7]  ? custom_button_vkb_index[7]  : 7'd62;
+wire [6:0]  effective_bound_index_b = custom_button_valid[5]  ? custom_button_vkb_index[5]  : 7'd8;
+wire [6:0]  effective_bound_index_x = custom_button_valid[6]  ? custom_button_vkb_index[6]  : 7'd64;
+wire [6:0]  effective_bound_index_y = custom_button_valid[7]  ? custom_button_vkb_index[7]  : 7'd28;
 wire [6:0]  effective_bound_index_l = custom_button_valid[8]  ? custom_button_vkb_index[8]  : 7'd45;
 wire [6:0]  effective_bound_index_r = custom_button_valid[9]  ? custom_button_vkb_index[9]  : 7'd60;
 wire [6:0]  effective_bound_index_start = custom_button_valid[15] ? custom_button_vkb_index[15] : 7'd0;
 wire [1:0]  effective_bound_page_a = custom_button_valid[4]  ? custom_button_vkb_page[4]  : 2'd1;
-wire [1:0]  effective_bound_page_b = custom_button_valid[5]  ? custom_button_vkb_page[5]  : 2'd0;
+wire [1:0]  effective_bound_page_b = custom_button_valid[5]  ? custom_button_vkb_page[5]  : 2'd1;
 wire [1:0]  effective_bound_page_x = custom_button_valid[6]  ? custom_button_vkb_page[6]  : 2'd0;
 wire [1:0]  effective_bound_page_y = custom_button_valid[7]  ? custom_button_vkb_page[7]  : 2'd0;
 wire [1:0]  effective_bound_page_l = custom_button_valid[8]  ? custom_button_vkb_page[8]  : 2'd0;
@@ -503,9 +503,9 @@ function [9:0] map_normal_button_to_ps2;
                 4'd2: map_normal_button_to_ps2 = map_normal_dpad_to_ps2(button, dpad_mode);
                 4'd3: map_normal_button_to_ps2 = map_normal_dpad_to_ps2(button, dpad_mode);
                 4'd4: map_normal_button_to_ps2 = 10'd0; // A handled as joystick fire 1
-                4'd5: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // B           -> Space
-                4'd6: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // X           -> Return
-                4'd7: map_normal_button_to_ps2 = {1'b1, 1'b1, 8'h70}; // Y           -> COPY
+                4'd5: map_normal_button_to_ps2 = 10'd0; // B handled as joystick up
+                4'd6: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // X           -> Space
+                4'd7: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // Y           -> Return
                 4'd8: map_normal_button_to_ps2 = {1'b1, 1'b0, PS2_LSHIFT}; // L       -> Shift
                 4'd9: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h14}; // R           -> Ctrl
                 4'd15: map_normal_button_to_ps2 = {1'b1, 1'b0, 8'h76}; // Start      -> Escape
@@ -522,9 +522,9 @@ function [9:0] map_vkb_button_to_ps2;
     begin
         case (button)
             4'd4: map_vkb_button_to_ps2 = is_pressed ? map_vkb_index_to_ps2(vkb_index, vkb_page) : {1'b1, held_ps2};
-            4'd5: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // B -> Space
-            4'd6: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // X -> Return
-            4'd7: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h66}; // Y -> Delete/Backspace
+            4'd5: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h66}; // B -> Delete/Backspace
+            4'd6: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h29}; // X -> Space
+            4'd7: map_vkb_button_to_ps2 = {1'b1, 1'b0, 8'h5A}; // Y -> Return
             default: map_vkb_button_to_ps2 = 10'd0;
         endcase
     end

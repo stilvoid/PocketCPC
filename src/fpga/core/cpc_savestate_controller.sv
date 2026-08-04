@@ -146,26 +146,28 @@ localparam [5:0]
     SAVE_RAM_REQ0      = 6'd4,
     SAVE_RAM_WAIT0     = 6'd5,
     SAVE_RAM_WAIT1     = 6'd6,
-    SAVE_RAM_STORE_REQ = 6'd7,
-    SAVE_RAM_STORE_SEND = 6'd8,
-    SAVE_RAM_STORE_WAIT = 6'd9,
+    SAVE_RAM_WAIT2     = 6'd7,
+    SAVE_RAM_STORE_REQ = 6'd8,
+    SAVE_RAM_STORE_WAIT0 = 6'd9,
+    SAVE_RAM_STORE_SEND = 6'd12,
+    SAVE_RAM_STORE_WAIT = 6'd13,
     SAVE_VERIFY_REQ0   = 6'd10,
     SAVE_VERIFY_WAIT0  = 6'd11,
-    SAVE_VERIFY_REQ1   = 6'd12,
-    SAVE_VERIFY_WAIT1  = 6'd13,
+    SAVE_VERIFY_REQ1   = 6'd15,
+    SAVE_VERIFY_WAIT1  = 6'd16,
     SAVE_WAIT_FRAME    = 6'd14,
-    LOAD_IDLE          = 6'd16,
-    LOAD_WAIT_BLOB     = 6'd17,
-    LOAD_BUFFER_REQ    = 6'd18,
-    LOAD_BUFFER_WAIT   = 6'd19,
-    LOAD_CAPTURE       = 6'd20,
-    LOAD_RAM_LO        = 6'd21,
-    LOAD_RAM_HI        = 6'd22,
-    LOAD_COMMIT        = 6'd23,
-    LOAD_APPLY_WAIT    = 6'd24,
-    LOAD_FRONT_WAIT    = 6'd25,
-    LOAD_FRONT_CAPTURE = 6'd26,
-    LOAD_WAIT_FRAME    = 6'd27;
+    LOAD_IDLE          = 6'd17,
+    LOAD_WAIT_BLOB     = 6'd18,
+    LOAD_BUFFER_REQ    = 6'd19,
+    LOAD_BUFFER_WAIT   = 6'd20,
+    LOAD_CAPTURE       = 6'd21,
+    LOAD_RAM_LO        = 6'd22,
+    LOAD_RAM_HI        = 6'd23,
+    LOAD_COMMIT        = 6'd24,
+    LOAD_APPLY_WAIT    = 6'd25,
+    LOAD_FRONT_WAIT    = 6'd26,
+    LOAD_FRONT_CAPTURE = 6'd27,
+    LOAD_WAIT_FRAME    = 6'd28;
 
 localparam [7:0]
     DBG_RESULT_NONE               = 8'd0,
@@ -1464,7 +1466,11 @@ always @(posedge clk or negedge reset_n) begin
 
             SAVE_SETTLE: begin
                 freeze_cpu <= 1'b1;
-                if (save_settle_count == 5'd0) begin
+                // Let the freeze request propagate through the machine before
+                // latching the exported register/timing state. Sampling on the
+                // first settle cycle can capture a pre-freeze mix of CPU and
+                // peripheral state even though RAM capture happens later.
+                if (save_settle_count == 5'd7) begin
                     save_hdr_model        <= state_model;
                     save_hdr_cpu_dir      <= state_cpu_dir;
                     save_hdr_crtc_addr    <= state_crtc_addr;
@@ -1486,8 +1492,6 @@ always @(posedge clk or negedge reset_n) begin
                     save_hdr_psg_regs     <= state_psg_regs;
                     save_hdr_mem_size_kb  <= save_snapshot_mem_size_kb;
                     save_hdr_machine_type <= save_snapshot_machine_type;
-                end
-                if (save_settle_count == 5'd7) begin
                     save_state <= SAVE_HEADER_REQ;
                 end else begin
                     save_settle_count <= save_settle_count + 5'd1;
@@ -1572,8 +1576,10 @@ always @(posedge clk or negedge reset_n) begin
                 save_state            <= SAVE_RAM_WAIT0;
             end
 
-            // The shared CPC RAM capture port has a registered address path.
-            // Hold each requested word address for a full cycle before sampling.
+            // The shared CPC RAM capture port has a registered address path,
+            // and save capture steals that port away from the live video scan.
+            // Hold each requested address for two full cycles before sampling
+            // to avoid occasionally latching the previous address's word.
             SAVE_RAM_WAIT0: begin
                 freeze_cpu            <= 1'b1;
                 capture_ram_rd        <= 1'b1;
@@ -1584,12 +1590,26 @@ always @(posedge clk or negedge reset_n) begin
             SAVE_RAM_WAIT1: begin
                 freeze_cpu            <= 1'b1;
                 capture_ram_rd        <= 1'b1;
+                capture_ram_word_addr <= ram_capture_base;
+                save_state            <= SAVE_RAM_WAIT2;
+            end
+
+            SAVE_RAM_WAIT2: begin
+                freeze_cpu            <= 1'b1;
+                capture_ram_rd        <= 1'b1;
                 saved_ram_word_lo     <= capture_ram_word_data;
                 capture_ram_word_addr <= ram_capture_base + 16'd1;
                 save_state            <= SAVE_RAM_STORE_REQ;
             end
 
             SAVE_RAM_STORE_REQ: begin
+                freeze_cpu            <= 1'b1;
+                capture_ram_rd        <= 1'b1;
+                capture_ram_word_addr <= ram_capture_base + 16'd1;
+                save_state            <= SAVE_RAM_STORE_WAIT0;
+            end
+
+            SAVE_RAM_STORE_WAIT0: begin
                 freeze_cpu            <= 1'b1;
                 capture_ram_rd        <= 1'b1;
                 capture_ram_word_addr <= ram_capture_base + 16'd1;
